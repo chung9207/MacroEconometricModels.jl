@@ -1,7 +1,7 @@
 name = "Macroeconometrics"
-uuid = "12345678-1234-1234-1234-1234567890ab"
+uuid = "14a6ec33-bcac-448e-845f-2fb6769698f1"
 version = "0.1.0"
-authors = ["User"]
+authors = ["Wookyung Chung <mirimtl@protonmail.com>"]
 
 [deps]
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
@@ -17,13 +17,15 @@ StatsAPI = "82ae8749-77ed-4fe6-ae5f-f523153014b0"
 Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
 
 [compat]
-CSV = "0.10.15"
-FFTW = "1.5"
-StatsAPI = "1.8.0"
-julia = "1.6"
-Turing = "0.29"
-MCMCChains = "6.0"
+CSV = "0.10"
+DataFrames = "1"
 Distributions = "0.25"
+FFTW = "1.5"
+MCMCChains = "6"
+SpecialFunctions = "2"
+StatsAPI = "1"
+Turing = "0.29"
+julia = "1.6"
 
 [extras]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
