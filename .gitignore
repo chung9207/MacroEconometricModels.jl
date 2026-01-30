@@ -1,0 +1,23 @@
+# Generated documentation
+docs/build/
+
+# macOS system files
+.DS_Store
+**/.DS_Store
+
+# PDF research papers
+*.pdf
+
+# IDE/editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Julia coverage/memory files
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
+
+# Claude Code settings
+.claude/

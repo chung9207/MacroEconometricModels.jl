@@ -1,0 +1,132 @@
+"""
+Impulse Response Functions for frequentist and Bayesian VAR models.
+"""
+
+using LinearAlgebra, Statistics, MCMCChains
+
+# =============================================================================
+# Frequentist IRF
+# =============================================================================
+
+"""
+    irf(model, horizon; method=:cholesky, ci_type=:none, reps=200, conf_level=0.95, ...)
+
+Compute IRFs with optional confidence intervals.
+
+Methods: :cholesky, :sign, :narrative, :long_run.
+CI types: :none, :bootstrap, :theoretical.
+"""
+function irf(model::VARModel{T}, horizon::Int;
+    method::Symbol=:cholesky, check_func=nothing, narrative_check=nothing,
+    ci_type::Symbol=:none, reps::Int=200, conf_level::Real=0.95
+) where {T<:AbstractFloat}
+
+    n = nvars(model)
+    Q = compute_Q(model, method, horizon, check_func, narrative_check)
+    point_irf = compute_irf(model, Q, horizon)
+
+    ci_lower, ci_upper = zeros(T, horizon, n, n), zeros(T, horizon, n, n)
+    if ci_type != :none
+        sim_irfs = _simulate_irfs(model, method, horizon, check_func, narrative_check, ci_type, reps)
+        alpha = (1 - T(conf_level)) / 2
+        @inbounds for h in 1:horizon, v in 1:n, s in 1:n
+            d = @view sim_irfs[:, h, v, s]
+            ci_lower[h, v, s], ci_upper[h, v, s] = quantile(d, alpha), quantile(d, 1 - alpha)
+        end
+    end
+
+    ImpulseResponse{T}(point_irf, ci_lower, ci_upper, horizon,
+                       default_var_names(n), default_shock_names(n), ci_type)
+end
+
+"""Simulate IRFs for confidence intervals (bootstrap or asymptotic)."""
+function _simulate_irfs(model::VARModel{T}, method::Symbol, horizon::Int,
+    check_func, narrative_check, ci_type::Symbol, reps::Int
+) where {T<:AbstractFloat}
+    n, p = nvars(model), model.p
+    sim_irfs = zeros(T, reps, horizon, n, n)
+
+    if ci_type == :bootstrap
+        U, T_eff = model.U, size(model.U, 1)
+        Y_init = model.Y[1:p, :]
+
+        Threads.@threads for r in 1:reps
+            U_boot = U[rand(1:T_eff, T_eff), :]
+            Y_boot = _simulate_var(Y_init, model.B, U_boot, T_eff + p)
+            m = estimate_var(Y_boot, p)
+            Q = compute_Q(m, method, horizon, check_func, narrative_check)
+            sim_irfs[r, :, :, :] = compute_irf(m, Q, horizon)
+        end
+    elseif ci_type == :theoretical
+        _, X = construct_var_matrices(model.Y, p)
+        L_V, L_S = safe_cholesky(robust_inv(X'X)), safe_cholesky(model.Sigma)
+        k = ncoefs(model)
+
+        Threads.@threads for r in 1:reps
+            B_star = model.B + L_V * randn(T, k, n) * L_S'
+            m = VARModel(zeros(T, 0, n), p, B_star, zeros(T, 0, n), model.Sigma, zero(T), zero(T), zero(T))
+            Q = compute_Q(m, method, horizon, check_func, narrative_check)
+            sim_irfs[r, :, :, :] = compute_irf(m, Q, horizon)
+        end
+    end
+    sim_irfs
+end
+
+"""Simulate VAR data from initial conditions and innovations."""
+function _simulate_var(Y_init::AbstractMatrix{T}, B::AbstractMatrix{T},
+                       U::AbstractMatrix{T}, T_total::Int) where {T<:AbstractFloat}
+    p, n = size(Y_init)
+    Y = zeros(T, T_total, n)
+    Y[1:p, :] = Y_init
+
+    A = extract_ar_coefficients(B, n, p)
+    intercept = @view B[1, :]
+
+    @inbounds for t in (p+1):T_total
+        Y[t, :] = intercept
+        for i in 1:p
+            Y[t, :] .+= A[i] * @view(Y[t-i, :])
+        end
+        Y[t, :] .+= @view(U[t-p, :])
+    end
+    Y
+end
+
+# =============================================================================
+# Bayesian IRF
+# =============================================================================
+
+"""
+    irf(chain, p, n, horizon; method=:cholesky, quantiles=[0.16, 0.5, 0.84], ...)
+
+Compute Bayesian IRFs from MCMC chain with posterior quantiles.
+"""
+function irf(chain::Chains, p::Int, n::Int, horizon::Int;
+    method::Symbol=:cholesky, data::AbstractMatrix=Matrix{Float64}(undef, 0, 0),
+    check_func=nothing, narrative_check=nothing, quantiles::Vector{<:Real}=[0.16, 0.5, 0.84]
+)
+    method == :narrative && isempty(data) && throw(ArgumentError("Narrative needs data"))
+
+    samples = size(chain, 1)
+    ET = isempty(data) ? Float64 : eltype(data)
+    all_irfs = zeros(ET, samples, horizon, n, n)
+
+    b_vecs, sigmas = extract_chain_parameters(chain)
+    for s in 1:samples
+        m = parameters_to_model(b_vecs[s, :], sigmas[s, :], p, n, data)
+        Q = compute_Q(m, method, horizon, check_func, narrative_check; max_draws=100)
+        all_irfs[s, :, :, :] = compute_irf(m, Q, horizon)
+    end
+
+    q_vec = ET.(quantiles)
+    irf_q = zeros(ET, horizon, n, n, length(quantiles))
+    irf_m = zeros(ET, horizon, n, n)
+
+    @inbounds for h in 1:horizon, v in 1:n, sh in 1:n
+        d = @view all_irfs[:, h, v, sh]
+        irf_q[h, v, sh, :] = quantile(d, q_vec)
+        irf_m[h, v, sh] = mean(d)
+    end
+
+    BayesianImpulseResponse{ET}(irf_q, irf_m, horizon, default_var_names(n), default_shock_names(n), q_vec)
+end
