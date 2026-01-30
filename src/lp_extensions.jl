@@ -773,7 +773,7 @@ function estimate_propensity_score(treatment::AbstractVector{Bool}, X::AbstractM
     end
 
     eta = X_aug * beta
-    p = method == :logit ? @. 1 / (1 + exp(-eta)) : @. cdf(Normal(), eta)
+    p = method == :logit ? (@. 1 / (1 + exp(-eta))) : (@. cdf(Normal(), eta))
     clamp.(p, T(1e-10), T(1 - 1e-10))
 end
 
