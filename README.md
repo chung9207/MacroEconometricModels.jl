@@ -25,7 +25,7 @@ A Julia package for macroeconomic time series analysis.
 
 ```julia
 using Pkg
-Pkg.add(url="https://github.com/chung9207/Macroeconometrics.jl")
+Pkg.add("Macroeconometrics")
 ```
 
 ## Quick Start
