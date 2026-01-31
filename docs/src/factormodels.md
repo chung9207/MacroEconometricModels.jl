@@ -646,7 +646,7 @@ idio_driven = findall(shares .< 0.3)
 
 ## References
 
-### Core Theory
+### Core References
 
 - Bai, J. (2003). "Inferential Theory for Factor Models of Large Dimensions." *Econometrica*, 71(1), 135-171.
 - Bai, J., & Ng, S. (2002). "Determining the Number of Factors in Approximate Factor Models." *Econometrica*, 70(1), 191-221.
