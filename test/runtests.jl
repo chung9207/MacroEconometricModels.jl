@@ -55,6 +55,10 @@ using Test
         include("test_lp.jl")
     end
 
+    @testset "Utility Functions" begin
+        include("test_utils.jl")
+    end
+
     @testset "Documentation Examples" begin
         include("test_examples.jl")
     end

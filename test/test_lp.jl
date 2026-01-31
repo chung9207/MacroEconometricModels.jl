@@ -486,4 +486,299 @@ using Random
         @test haskey(wk_test, :passes_threshold)
         # With weak instrument, some horizons should fail threshold
     end
+
+    # ==========================================================================
+    # Extended Coverage Tests for lp_extensions.jl
+    # ==========================================================================
+
+    @testset "LP-IV Sargan Overidentification Test" begin
+        Random.seed!(77777)
+        T_sar = 300
+        n_sar = 2
+
+        # Create overidentified IV scenario (2 instruments for 1 endogenous)
+        Z_sar = randn(T_sar, 2)  # Two instruments
+        shock_sar = 0.4 * Z_sar[:, 1] + 0.3 * Z_sar[:, 2] + 0.3 * randn(T_sar)
+
+        Y_sar = zeros(T_sar, n_sar)
+        Y_sar[:, 1] = shock_sar
+        for t in 2:T_sar
+            Y_sar[t, 2] = 0.3 * Y_sar[t-1, 2] + 0.5 * shock_sar[t] + randn()
+        end
+
+        model_sar = estimate_lp_iv(Y_sar, 1, Z_sar, 5; lags=2)
+        @test model_sar isa LPIVModel
+        @test MacroEconometricModels.n_instruments(model_sar) == 2
+
+        # Sargan test for overidentification
+        sargan_result = MacroEconometricModels.sargan_test(model_sar, 0)
+        @test haskey(sargan_result, :J_stat)
+        @test haskey(sargan_result, :p_value)
+        @test haskey(sargan_result, :df)
+        @test sargan_result.df == 1  # 2 instruments - 1 endogenous = 1 df
+        @test sargan_result.valid == true
+
+        # Test with just-identified model (should return NaN)
+        Z_just = randn(T_sar, 1)
+        shock_just = 0.5 * Z_just[:, 1] + 0.5 * randn(T_sar)
+        Y_just = zeros(T_sar, n_sar)
+        Y_just[:, 1] = shock_just
+        for t in 2:T_sar
+            Y_just[t, 2] = 0.3 * Y_just[t-1, 2] + 0.5 * shock_just[t] + randn()
+        end
+        model_just = estimate_lp_iv(Y_just, 1, Z_just, 3; lags=2)
+        sargan_just = MacroEconometricModels.sargan_test(model_just, 0)
+        @test sargan_just.valid == false
+    end
+
+    @testset "Smooth LP Cross-Validation" begin
+        Random.seed!(88888)
+        T_cv = 200
+        n_cv = 2
+        Y_cv = zeros(T_cv, n_cv)
+        for t in 2:T_cv
+            Y_cv[t, :] = 0.5 * Y_cv[t-1, :] + randn(n_cv)
+        end
+
+        # Test cross-validation for lambda selection
+        lambda_grid = Float64.([0.01, 0.1, 1.0, 10.0])
+        optimal_lambda = MacroEconometricModels.cross_validate_lambda(
+            Y_cv, 1, 10; lambda_grid=lambda_grid, k_folds=3, lags=2
+        )
+        @test optimal_lambda in lambda_grid
+        @test optimal_lambda > 0
+    end
+
+    @testset "Smooth LP Comparison Function" begin
+        Random.seed!(99999)
+        T_cmp = 150
+        n_cmp = 2
+        Y_cmp = zeros(T_cmp, n_cmp)
+        for t in 2:T_cmp
+            Y_cmp[t, :] = 0.5 * Y_cmp[t-1, :] + randn(n_cmp)
+        end
+
+        # Compare standard and smooth LP
+        comparison = MacroEconometricModels.compare_smooth_lp(Y_cmp, 1, 10; lambda=1.0, lags=2)
+        @test haskey(comparison, :standard_irf)
+        @test haskey(comparison, :smooth_irf)
+        @test haskey(comparison, :variance_reduction)
+        @test comparison.standard_irf isa LPImpulseResponse
+        @test comparison.smooth_irf isa LPImpulseResponse
+        # Variance reduction should be positive (smooth reduces variance)
+        @test comparison.variance_reduction > 0
+    end
+
+    @testset "B-Spline Basis Functions" begin
+        # Test bspline_basis_value edge cases
+        horizons = collect(0:10)
+
+        # Degree 0 (piecewise constant)
+        basis_d0 = MacroEconometricModels.bspline_basis(horizons, 0, 2; T=Float64)
+        @test size(basis_d0.basis_matrix, 1) == 11
+        @test basis_d0.degree == 0
+
+        # Degree 1 (piecewise linear)
+        basis_d1 = MacroEconometricModels.bspline_basis(horizons, 1, 2; T=Float64)
+        @test basis_d1.degree == 1
+
+        # Degree 3 (cubic, standard)
+        basis_d3 = MacroEconometricModels.bspline_basis(horizons, 3, 4; T=Float64)
+        @test basis_d3.degree == 3
+        @test MacroEconometricModels.n_basis(basis_d3) == 4 + 3 + 1  # n_knots + degree + 1
+
+        # Roughness penalty matrix
+        R = MacroEconometricModels.roughness_penalty_matrix(basis_d3)
+        @test size(R, 1) == size(R, 2)
+        @test issymmetric(R)
+    end
+
+    @testset "Transition Functions for State-Dependent LP" begin
+        Random.seed!(10101)
+        z = randn(100)
+        gamma = 1.5
+        c = 0.0
+
+        # Logistic transition
+        F_logistic = MacroEconometricModels.logistic_transition(z, gamma, c)
+        @test all(0 .<= F_logistic .<= 1)
+        @test MacroEconometricModels.logistic_transition(c, gamma, c) ≈ 0.5  # At threshold, F = 0.5
+
+        # Exponential transition
+        F_exp = MacroEconometricModels.exponential_transition(z, gamma, c)
+        @test all(0 .<= F_exp .<= 1)
+        @test MacroEconometricModels.exponential_transition([c], gamma, c)[1] ≈ 0.0  # At threshold, F = 0
+
+        # Indicator transition
+        F_ind = MacroEconometricModels.indicator_transition(z, c)
+        @test all(F_ind .== 0.0 .|| F_ind .== 1.0)
+        @test sum(F_ind) == sum(z .>= c)
+    end
+
+    @testset "State Transition Parameter Estimation" begin
+        Random.seed!(20202)
+        T_st = 200
+        n_st = 2
+
+        z_st = randn(T_st)
+        Y_st = zeros(T_st, n_st)
+        for t in 2:T_st
+            Y_st[t, :] = 0.5 * Y_st[t-1, :] + randn(n_st)
+        end
+
+        # Test NLLS method
+        result_nlls = MacroEconometricModels.estimate_transition_params(
+            z_st, Y_st, 1; method=:nlls, c_init=:median
+        )
+        @test haskey(result_nlls, :gamma)
+        @test haskey(result_nlls, :c)
+        @test haskey(result_nlls, :F_values)
+        @test result_nlls.gamma > 0
+        @test all(0 .<= result_nlls.F_values .<= 1)
+
+        # Test grid search method
+        result_grid = MacroEconometricModels.estimate_transition_params(
+            z_st, Y_st, 1; method=:grid_search, c_init=:mean
+        )
+        @test haskey(result_grid, :gamma)
+        @test haskey(result_grid, :c)
+        @test result_grid.convergence_info.method == :grid_search
+    end
+
+    @testset "State-Dependent LP - Regime IRFs" begin
+        Random.seed!(30303)
+        T_reg = 250
+        n_reg = 2
+
+        z_reg = cumsum(randn(T_reg)) ./ sqrt(T_reg)
+        z_std = (z_reg .- mean(z_reg)) ./ std(z_reg)
+
+        Y_reg = zeros(T_reg, n_reg)
+        for t in 2:T_reg
+            F_t = 1 / (1 + exp(-1.5 * z_std[t]))
+            rho_t = F_t * 0.8 + (1 - F_t) * 0.3
+            Y_reg[t, :] = rho_t * Y_reg[t-1, :] + randn(n_reg)
+        end
+
+        model_reg = estimate_state_lp(Y_reg, 1, z_std, 8; gamma=1.5, threshold=0.0, lags=2)
+
+        # Test individual regime IRF extraction
+        irf_exp = state_irf(model_reg; regime=:expansion)
+        @test haskey(irf_exp, :values)
+        @test irf_exp.regime == :expansion
+
+        irf_rec = state_irf(model_reg; regime=:recession)
+        @test irf_rec.regime == :recession
+
+        irf_diff = state_irf(model_reg; regime=:difference)
+        @test irf_diff.regime == :difference
+
+        # Test regime difference test across all horizons
+        diff_all = test_regime_difference(model_reg)
+        @test haskey(diff_all, :t_stats)
+        @test haskey(diff_all, :p_values)
+        @test haskey(diff_all, :joint_test)
+        @test size(diff_all.t_stats, 1) == 9  # horizons 0-8
+    end
+
+    @testset "Propensity Score Estimation Methods" begin
+        Random.seed!(40404)
+        T_ps = 200
+
+        X_ps = randn(T_ps, 2)
+        p_true = 1 ./ (1 .+ exp.(-0.5 .* X_ps[:, 1] .- 0.3 .* X_ps[:, 2]))
+        treatment_ps = rand(T_ps) .< p_true
+
+        # Test logit
+        p_logit = MacroEconometricModels.estimate_propensity_score(treatment_ps, X_ps; method=:logit)
+        @test all(0 .< p_logit .< 1)
+        @test length(p_logit) == T_ps
+
+        # Test probit
+        p_probit = MacroEconometricModels.estimate_propensity_score(treatment_ps, X_ps; method=:probit)
+        @test all(0 .< p_probit .< 1)
+
+        # Test with integer treatment
+        treatment_int = Int.(treatment_ps)
+        p_int = MacroEconometricModels.estimate_propensity_score(treatment_int, X_ps; method=:logit)
+        @test all(0 .< p_int .< 1)
+    end
+
+    @testset "Inverse Propensity Weights" begin
+        Random.seed!(50505)
+        n_ipw = 100
+        treatment_ipw = rand(Bool, n_ipw)
+        propensity_ipw = 0.3 .+ 0.4 .* rand(n_ipw)  # Between 0.3 and 0.7
+
+        # Test IPW with normalization
+        w_norm = MacroEconometricModels.inverse_propensity_weights(
+            treatment_ipw, propensity_ipw; trimming=(0.05, 0.95), normalize=true
+        )
+        @test all(w_norm .> 0)
+        @test length(w_norm) == n_ipw
+
+        # Test IPW without normalization
+        w_unnorm = MacroEconometricModels.inverse_propensity_weights(
+            treatment_ipw, propensity_ipw; trimming=(0.01, 0.99), normalize=false
+        )
+        @test all(w_unnorm .> 0)
+
+        # Test trimming effect
+        propensity_extreme = vcat(fill(0.001, 10), fill(0.5, 80), fill(0.999, 10))
+        treatment_ext = rand(Bool, 100)
+        w_trimmed = MacroEconometricModels.inverse_propensity_weights(
+            treatment_ext, propensity_extreme; trimming=(0.05, 0.95), normalize=false
+        )
+        # Trimming should prevent extreme weights
+        @test maximum(w_trimmed) < 100
+    end
+
+    @testset "White Covariance Estimator" begin
+        Random.seed!(60606)
+        T_wh = 100
+        X_wh = hcat(ones(T_wh), randn(T_wh, 2))
+        u_wh = randn(T_wh)
+
+        V_white = white_vcov(X_wh, u_wh)
+        @test size(V_white) == (3, 3)
+        @test V_white ≈ V_white' atol=1e-10  # Approximately symmetric
+        @test all(diag(V_white) .>= 0)  # Diagonal should be non-negative
+    end
+
+    @testset "Kernel Weight Functions" begin
+        # Test different kernel types
+        @test kernel_weight(0, 10, :bartlett) == 1.0
+        @test kernel_weight(10, 10, :bartlett) ≈ 1 - 10/11
+        @test kernel_weight(15, 10, :bartlett) == 0.0
+
+        @test kernel_weight(0, 10, :parzen) == 1.0
+        @test kernel_weight(15, 10, :parzen) == 0.0
+
+        @test kernel_weight(0, 10, :quadratic_spectral) == 1.0
+        # Quadratic spectral kernel decays but doesn't necessarily hit zero
+
+        @test kernel_weight(0, 10, :tukey_hanning) == 1.0
+    end
+
+    @testset "LP with Different Covariance Types" begin
+        Random.seed!(70707)
+        T_cov = 150
+        n_cov = 2
+        Y_cov = zeros(T_cov, n_cov)
+        for t in 2:T_cov
+            Y_cov[t, :] = 0.5 * Y_cov[t-1, :] + randn(n_cov)
+        end
+
+        # Test with White covariance
+        model_white = estimate_lp(Y_cov, 1, 8; lags=2, cov_type=:white)
+        @test model_white isa LPModel
+        irf_white = lp_irf(model_white)
+        @test all(isfinite.(irf_white.se))
+
+        # Test with Newey-West and custom bandwidth
+        model_nw = estimate_lp(Y_cov, 1, 8; lags=2, cov_type=:newey_west, bandwidth=5)
+        @test model_nw isa LPModel
+        irf_nw = lp_irf(model_nw)
+        @test all(isfinite.(irf_nw.se))
+    end
 end
