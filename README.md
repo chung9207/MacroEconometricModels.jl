@@ -1,6 +1,7 @@
 # MacroEconometricModels.jl
 
 [![CI](https://github.com/chung9207/MacroEconometricModels.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/chung9207/MacroEconometricModels.jl/actions/workflows/CI.yml)
+[![codecov](https://codecov.io/gh/chung9207/MacroEconometricModels.jl/graph/badge.svg)](https://codecov.io/gh/chung9207/MacroEconometricModels.jl)
 [![](https://img.shields.io/badge/docs-latest-blue.svg)](https://chung9207.github.io/MacroEconometricModels.jl/dev/)
 [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18439170.svg)](https://doi.org/10.5281/zenodo.18439170)
