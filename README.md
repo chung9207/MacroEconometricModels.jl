@@ -33,9 +33,18 @@ Pkg.add("MacroEconometricModels")
 
 ```julia
 using MacroEconometricModels
+using Random
+
+# Generate synthetic VAR(1) data
+Random.seed!(42)
+T, n = 200, 3
+A = [0.5 0.1 0.0; 0.0 0.6 0.1; 0.1 0.0 0.4]  # VAR coefficients
+Y = zeros(T, n)
+for t in 2:T
+    Y[t, :] = A * Y[t-1, :] + randn(n)
+end
 
 # Estimate a VAR model
-Y = randn(100, 3)
 model = estimate_var(Y, 2)
 
 # Compute IRFs with bootstrap confidence intervals

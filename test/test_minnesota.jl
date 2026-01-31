@@ -48,4 +48,48 @@ Random.seed!(42)
     # Basic check: posterior mean should be somewhat reasonable (within bounds)
     # Just checking it runs and returns.
     println("Estimation Complete.")
+
+    # 3. Test optimize_hyperparameters_full
+    @testset "Full Hyperparameter Optimization" begin
+        println("Testing optimize_hyperparameters_full...")
+
+        # Generate data with clear VAR structure
+        T_full = 100
+        Y_full = zeros(T_full, n)
+        for t in 2:T_full
+            Y_full[t, :] = true_A * Y_full[t-1, :] + randn(2) * 0.5
+        end
+
+        # Test with small grids for speed
+        best_hyper, best_ml = optimize_hyperparameters_full(Y_full, p;
+            tau_grid=range(0.1, 2.0, length=3),
+            lambda_grid=[1.0, 5.0],
+            mu_grid=[1.0, 2.0]
+        )
+
+        @test best_hyper isa MinnesotaHyperparameters
+        @test best_hyper.tau > 0
+        @test best_hyper.lambda > 0
+        @test best_hyper.mu > 0
+        @test isfinite(best_ml)
+        @test best_ml > -Inf
+
+        # Verify the returned hyperparameters are from the grid
+        @test best_hyper.tau in range(0.1, 2.0, length=3)
+        @test best_hyper.lambda in [1.0, 5.0]
+        @test best_hyper.mu in [1.0, 2.0]
+
+        # Compare with single-parameter optimization
+        simple_hyper = optimize_hyperparameters(Y_full, p; grid_size=5)
+        @test simple_hyper isa MinnesotaHyperparameters
+
+        # Full optimization should find at least as good (or better) marginal likelihood
+        ml_full = log_marginal_likelihood(Y_full, p, best_hyper)
+        ml_simple = log_marginal_likelihood(Y_full, p, simple_hyper)
+        # Note: Not strictly >= because grids differ, but both should be finite
+        @test isfinite(ml_full)
+        @test isfinite(ml_simple)
+
+        println("Full Hyperparameter Optimization Test Complete.")
+    end
 end

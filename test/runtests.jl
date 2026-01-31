@@ -54,4 +54,8 @@ using Test
     @testset "Local Projections" begin
         include("test_lp.jl")
     end
+
+    @testset "Documentation Examples" begin
+        include("test_examples.jl")
+    end
 end
