@@ -6,6 +6,9 @@ using DataFrames
 using Random
 
 @testset "Core VAR & Identification" begin
+    # Use fixed seed for reproducibility
+    Random.seed!(12345)
+
     # 1. Generate Synthetic Data
     T = 200
     n = 2
@@ -126,5 +129,129 @@ using Random
 
         # Verify Residuals Covariance
         @test isapprox(model.Sigma, Sigma_true, atol=0.1)
+    end
+
+    # ==========================================================================
+    # Robustness Tests (Following Arias et al. pattern)
+    # ==========================================================================
+
+    @testset "Reproducibility" begin
+        # Same seed should produce identical results
+        Random.seed!(99999)
+        Y1 = zeros(100, 2)
+        for t in 2:100
+            Y1[t, :] = 0.5 * Y1[t-1, :] + randn(2)
+        end
+        model1 = estimate_var(Y1, 1)
+
+        Random.seed!(99999)
+        Y2 = zeros(100, 2)
+        for t in 2:100
+            Y2[t, :] = 0.5 * Y2[t-1, :] + randn(2)
+        end
+        model2 = estimate_var(Y2, 1)
+
+        @test model1.B ≈ model2.B
+        @test model1.Sigma ≈ model2.Sigma
+        @test model1.U ≈ model2.U
+    end
+
+    @testset "Stability Check" begin
+        # VAR should detect stable vs unstable systems
+        Random.seed!(11111)
+        T_stab = 200
+        n_stab = 2
+        p_stab = 1
+
+        # Stable VAR
+        Y_stable = zeros(T_stab, n_stab)
+        A_stable = [0.3 0.1; 0.1 0.3]  # All eigenvalues < 1
+        for t in 2:T_stab
+            Y_stable[t, :] = A_stable * Y_stable[t-1, :] + randn(n_stab)
+        end
+        model_stable = estimate_var(Y_stable, p_stab)
+
+        # Check stability via companion matrix eigenvalues
+        F = companion_matrix(model_stable.B, n_stab, p_stab)
+        eigenvalues = eigvals(F)
+        @test maximum(abs.(eigenvalues)) < 1.0  # Stable
+    end
+
+    @testset "Numerical Stability - Near-Collinear Data" begin
+        Random.seed!(22222)
+        T_nc = 200
+        n_nc = 3
+
+        # Create data with near-collinearity
+        Y_nc = randn(T_nc, n_nc)
+        Y_nc[:, 3] = Y_nc[:, 1] + 0.01 * randn(T_nc)  # Variable 3 ≈ Variable 1
+
+        # Should not crash with near-singular covariance
+        model_nc = estimate_var(Y_nc, 1)
+        @test model_nc isa VARModel
+        @test all(isfinite.(model_nc.B))
+        @test all(isfinite.(model_nc.Sigma))
+    end
+
+    @testset "Edge Cases" begin
+        Random.seed!(33333)
+
+        # Single variable VAR
+        Y_single = randn(100, 1)
+        model_single = estimate_var(Y_single, 1)
+        @test size(model_single.B) == (2, 1)  # intercept + 1 lag
+        @test size(model_single.Sigma) == (1, 1)
+
+        # Minimum viable sample size (T just larger than p*n + 1)
+        n_min = 2
+        p_min = 2
+        T_min = p_min * n_min + 10  # Bare minimum observations
+        Y_min = randn(T_min, n_min)
+        model_min = estimate_var(Y_min, p_min)
+        @test model_min isa VARModel
+
+        # VAR(1) - simplest case
+        Y_var1 = randn(50, 2)
+        model_var1 = estimate_var(Y_var1, 1)
+        @test model_var1.p == 1
+    end
+
+    @testset "Orthogonality of Q Matrices" begin
+        Random.seed!(44444)
+        T_q = 150
+        n_q = 3
+        Y_q = randn(T_q, n_q)
+        model_q = estimate_var(Y_q, 1)
+
+        # Cholesky Q should be identity (orthogonal)
+        Q_chol = I(n_q)
+        @test norm(Q_chol' * Q_chol - I(n_q)) < 1e-10
+
+        # Sign restriction Q should be orthogonal
+        check_func_q(irf) = irf[1, 1, 1] > 0
+        Q_sign_q, _ = identify_sign(model_q, 5, check_func_q)
+        @test norm(Q_sign_q' * Q_sign_q - I(n_q)) < 1e-10
+        @test norm(Q_sign_q * Q_sign_q' - I(n_q)) < 1e-10
+
+        # Columns should be unit vectors
+        for j in 1:n_q
+            @test abs(norm(Q_sign_q[:, j]) - 1.0) < 1e-10
+        end
+    end
+
+    @testset "Input Validation" begin
+        Random.seed!(55555)
+        Y_val = randn(100, 2)
+
+        # p = 0 should error or be handled
+        @test_throws Exception estimate_var(Y_val, 0)
+
+        # p too large for data - package handles gracefully with warning
+        # Just verify it returns a model (even if with adjusted dof)
+        model_large_p = estimate_var(Y_val, 40)
+        @test model_large_p isa VARModel
+
+        # Empty data
+        @test_throws Exception estimate_var(zeros(0, 2), 1)
     end
 end

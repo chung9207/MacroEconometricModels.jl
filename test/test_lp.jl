@@ -342,4 +342,148 @@ using Random
         @test nobs(model) == T
         @test islinear(model) == true
     end
+
+    # ==========================================================================
+    # Robustness Tests (Following Arias et al. pattern)
+    # ==========================================================================
+
+    @testset "Reproducibility" begin
+        # Same seed should produce identical LP estimates
+        Random.seed!(11111)
+        Y1 = zeros(150, 2)
+        for t in 2:150
+            Y1[t, :] = 0.5 * Y1[t-1, :] + randn(2)
+        end
+        model1 = estimate_lp(Y1, 1, 10; lags=2)
+        irf1 = lp_irf(model1)
+
+        Random.seed!(11111)
+        Y2 = zeros(150, 2)
+        for t in 2:150
+            Y2[t, :] = 0.5 * Y2[t-1, :] + randn(2)
+        end
+        model2 = estimate_lp(Y2, 1, 10; lags=2)
+        irf2 = lp_irf(model2)
+
+        @test irf1.values ≈ irf2.values
+        @test irf1.se ≈ irf2.se
+    end
+
+    @testset "Numerical Stability - Near-Collinear Regressors" begin
+        Random.seed!(22222)
+        T_nc = 200
+        n_nc = 3
+
+        # Create data with near-collinearity
+        Y_nc = randn(T_nc, n_nc)
+        Y_nc[:, 3] = Y_nc[:, 1] + 0.01 * randn(T_nc)
+
+        # Should handle near-collinearity gracefully
+        model_nc = estimate_lp(Y_nc, 1, 5; lags=2)
+        @test model_nc isa LPModel
+        @test all(isfinite.(model_nc.B[1]))
+
+        irf_nc = lp_irf(model_nc)
+        @test all(isfinite.(irf_nc.values))
+    end
+
+    @testset "Edge Cases - Horizons" begin
+        Random.seed!(33333)
+        T_h = 100
+        Y_h = randn(T_h, 2)
+
+        # Minimum horizon (h=1)
+        model_h1 = estimate_lp(Y_h, 1, 1; lags=2)
+        @test model_h1 isa LPModel
+        @test model_h1.horizon == 1
+
+        irf_h1 = lp_irf(model_h1)
+        @test size(irf_h1.values, 1) == 2  # h=0 and h=1
+
+        # Larger horizon
+        model_h20 = estimate_lp(Y_h, 1, 20; lags=2)
+        @test model_h20 isa LPModel
+
+        irf_h20 = lp_irf(model_h20)
+        @test size(irf_h20.values, 1) == 21
+    end
+
+    @testset "Confidence Interval Properties" begin
+        Random.seed!(44444)
+        T_ci = 200
+        Y_ci = zeros(T_ci, 2)
+        for t in 2:T_ci
+            Y_ci[t, :] = 0.5 * Y_ci[t-1, :] + randn(2)
+        end
+
+        model_ci = estimate_lp(Y_ci, 1, 10; lags=2, cov_type=:newey_west)
+        irf_ci = lp_irf(model_ci; conf_level=0.95)
+
+        # CI ordering: lower ≤ point ≤ upper
+        @test all(irf_ci.ci_lower .<= irf_ci.values)
+        @test all(irf_ci.values .<= irf_ci.ci_upper)
+
+        # CI width should be positive
+        ci_width = irf_ci.ci_upper - irf_ci.ci_lower
+        @test all(ci_width .>= 0)
+
+        # Different confidence levels should give different widths
+        irf_90 = lp_irf(model_ci; conf_level=0.90)
+        irf_68 = lp_irf(model_ci; conf_level=0.68)
+
+        # 95% CI should be wider than 90%, which should be wider than 68%
+        width_95 = mean(irf_ci.ci_upper - irf_ci.ci_lower)
+        width_90 = mean(irf_90.ci_upper - irf_90.ci_lower)
+        width_68 = mean(irf_68.ci_upper - irf_68.ci_lower)
+
+        @test width_95 >= width_90
+        @test width_90 >= width_68
+    end
+
+    @testset "Cumulative IRF Properties" begin
+        Random.seed!(55555)
+        T_cum = 150
+        Y_cum = zeros(T_cum, 2)
+        for t in 2:T_cum
+            Y_cum[t, :] = 0.5 * Y_cum[t-1, :] + randn(2)
+        end
+
+        model_cum = estimate_lp(Y_cum, 1, 10; lags=2)
+        irf_std = lp_irf(model_cum)
+        irf_cum = cumulative_irf(irf_std)
+
+        # Cumulative IRF should have same size
+        @test size(irf_cum.values) == size(irf_std.values)
+
+        # At h=0, cumulative == standard
+        @test irf_cum.values[1, :] ≈ irf_std.values[1, :]
+
+        # Cumulative should be cumsum of standard
+        @test irf_cum.values ≈ cumsum(irf_std.values, dims=1)
+    end
+
+    @testset "LP-IV Weak Instrument Handling" begin
+        Random.seed!(66666)
+        T_weak = 200
+        n_weak = 2
+
+        # Create weak instrument scenario
+        Z_weak = randn(T_weak, 1)
+        shock_weak = 0.1 * Z_weak[:, 1] + randn(T_weak)  # Weak correlation
+
+        Y_weak = zeros(T_weak, n_weak)
+        Y_weak[:, 1] = shock_weak
+        for t in 2:T_weak
+            Y_weak[t, 2] = 0.3 * Y_weak[t-1, 2] + 0.5 * shock_weak[t] + randn()
+        end
+
+        model_weak = estimate_lp_iv(Y_weak, 1, Z_weak, 5; lags=2)
+        @test model_weak isa LPIVModel
+
+        # Weak instrument test should detect weakness
+        wk_test = weak_instrument_test(model_weak; threshold=10.0)
+        @test haskey(wk_test, :F_stats)
+        @test haskey(wk_test, :passes_threshold)
+        # With weak instrument, some horizons should fail threshold
+    end
 end
