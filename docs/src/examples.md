@@ -615,14 +615,315 @@ println("="^50)
 
 ---
 
+## Example 7: Unit Root Testing and Pre-Estimation Analysis
+
+This example demonstrates comprehensive unit root testing before fitting VAR models.
+
+### Individual Unit Root Tests
+
+```julia
+using MacroEconometricModels
+using Random
+using Statistics
+
+Random.seed!(42)
+
+# Generate data: mix of I(0) and I(1) series
+T = 200
+y_stationary = randn(T)                      # I(0): stationary
+y_random_walk = cumsum(randn(T))             # I(1): unit root
+y_trend_stat = 0.1 .* (1:T) .+ randn(T)      # Trend stationary
+y_with_break = vcat(randn(100), randn(100) .+ 2)  # Structural break
+
+# === ADF Test ===
+println("="^60)
+println("ADF Test (H₀: unit root)")
+println("="^60)
+
+adf_stat = adf_test(y_stationary; lags=:aic, regression=:constant)
+println("\nStationary series:")
+println("  Statistic: ", round(adf_stat.statistic, digits=3))
+println("  P-value: ", round(adf_stat.pvalue, digits=4))
+println("  Lags: ", adf_stat.lags)
+
+adf_rw = adf_test(y_random_walk; lags=:aic, regression=:constant)
+println("\nRandom walk:")
+println("  Statistic: ", round(adf_rw.statistic, digits=3))
+println("  P-value: ", round(adf_rw.pvalue, digits=4))
+```
+
+### KPSS Complementary Test
+
+```julia
+# === KPSS Test ===
+println("\n" * "="^60)
+println("KPSS Test (H₀: stationarity)")
+println("="^60)
+
+kpss_stat = kpss_test(y_stationary; regression=:constant)
+println("\nStationary series:")
+println("  Statistic: ", round(kpss_stat.statistic, digits=4))
+println("  P-value: ", kpss_stat.pvalue > 0.10 ? ">0.10" : round(kpss_stat.pvalue, digits=4))
+println("  Bandwidth: ", kpss_stat.bandwidth)
+
+kpss_rw = kpss_test(y_random_walk; regression=:constant)
+println("\nRandom walk:")
+println("  Statistic: ", round(kpss_rw.statistic, digits=4))
+println("  P-value: ", kpss_rw.pvalue < 0.01 ? "<0.01" : round(kpss_rw.pvalue, digits=4))
+```
+
+### Combining ADF and KPSS for Robust Inference
+
+```julia
+# === Combined Analysis ===
+println("\n" * "="^60)
+println("Combined ADF + KPSS Analysis")
+println("="^60)
+
+function unit_root_decision(y; name="Series")
+    adf = adf_test(y; lags=:aic)
+    kpss = kpss_test(y)
+
+    adf_reject = adf.pvalue < 0.05  # Reject unit root
+    kpss_reject = kpss.pvalue < 0.05  # Reject stationarity
+
+    decision = if adf_reject && !kpss_reject
+        "I(0) - Stationary"
+    elseif !adf_reject && kpss_reject
+        "I(1) - Unit root"
+    elseif adf_reject && kpss_reject
+        "Conflicting (possible structural break)"
+    else
+        "Inconclusive"
+    end
+
+    println("\n$name:")
+    println("  ADF p-value: ", round(adf.pvalue, digits=4))
+    println("  KPSS p-value: ", round(kpss.pvalue, digits=4))
+    println("  Decision: $decision")
+
+    return decision
+end
+
+unit_root_decision(y_stationary; name="Stationary series")
+unit_root_decision(y_random_walk; name="Random walk")
+unit_root_decision(y_trend_stat; name="Trend stationary")
+```
+
+### Testing for Structural Breaks
+
+```julia
+# === Zivot-Andrews Test ===
+println("\n" * "="^60)
+println("Zivot-Andrews Test (H₀: unit root without break)")
+println("="^60)
+
+za_result = za_test(y_with_break; regression=:constant, trim=0.15)
+println("\nSeries with structural break:")
+println("  Minimum t-stat: ", round(za_result.statistic, digits=3))
+println("  P-value: ", round(za_result.pvalue, digits=4))
+println("  Break index: ", za_result.break_index)
+println("  Break at: ", round(za_result.break_fraction * 100, digits=1), "% of sample")
+
+# Compare with standard ADF
+adf_break = adf_test(y_with_break)
+println("\n  ADF (ignoring break): p=", round(adf_break.pvalue, digits=4))
+println("  ZA (allowing break): p=", round(za_result.pvalue, digits=4))
+```
+
+### Ng-Perron Tests for Small Samples
+
+```julia
+# === Ng-Perron Tests ===
+println("\n" * "="^60)
+println("Ng-Perron Tests (improved size properties)")
+println("="^60)
+
+# Generate smaller sample
+y_small = cumsum(randn(80))
+np_result = ngperron_test(y_small; regression=:constant)
+
+println("\nSmall sample (n=80):")
+println("  MZα: ", round(np_result.MZa, digits=3),
+        " (5% CV: ", np_result.critical_values[:MZa][5], ")")
+println("  MZt: ", round(np_result.MZt, digits=3),
+        " (5% CV: ", np_result.critical_values[:MZt][5], ")")
+println("  MSB: ", round(np_result.MSB, digits=4),
+        " (5% CV: ", np_result.critical_values[:MSB][5], ")")
+println("  MPT: ", round(np_result.MPT, digits=3),
+        " (5% CV: ", np_result.critical_values[:MPT][5], ")")
+```
+
+### Johansen Cointegration Test
+
+```julia
+# === Johansen Cointegration Test ===
+println("\n" * "="^60)
+println("Johansen Cointegration Test")
+println("="^60)
+
+# Generate cointegrated system
+T_coint = 200
+u1, u2, u3 = cumsum(randn(T_coint)), cumsum(randn(T_coint)), randn(T_coint)
+Y_coint = hcat(
+    u1 + 0.1*randn(T_coint),           # I(1)
+    u1 + 0.5*u2 + 0.1*randn(T_coint),  # Cointegrated with first
+    u2 + 0.1*randn(T_coint)            # I(1)
+)
+
+johansen = johansen_test(Y_coint, 2; deterministic=:constant)
+
+println("\nCointegrated system (3 variables):")
+println("  Estimated rank: ", johansen.rank)
+println("\n  Trace test:")
+for r in 0:2
+    stat = round(johansen.trace_stats[r+1], digits=2)
+    cv = round(johansen.critical_values_trace[r+1, 2], digits=2)
+    reject = stat > cv ? "Reject" : "Fail to reject"
+    println("    H₀: r ≤ $r: stat=$stat, 5% CV=$cv → $reject")
+end
+
+println("\n  Eigenvalues: ", round.(johansen.eigenvalues, digits=4))
+
+if johansen.rank > 0
+    println("\n  Cointegrating vector(s):")
+    for i in 1:johansen.rank
+        println("    β$i: ", round.(johansen.eigenvectors[:, i], digits=3))
+    end
+end
+```
+
+### Testing All Variables Before VAR
+
+```julia
+# === Multi-Variable Pre-VAR Analysis ===
+println("\n" * "="^60)
+println("Pre-VAR Unit Root Analysis")
+println("="^60)
+
+# Typical macro dataset
+Y_macro = hcat(
+    cumsum(randn(T)),           # GDP (I(1))
+    0.8*cumsum(randn(T)[1:T]),  # Inflation (I(1))
+    cumsum(randn(T)),           # Interest rate (I(1))
+    randn(T)                    # Output gap (I(0))
+)
+var_names = ["GDP", "Inflation", "Rate", "Output Gap"]
+
+# Test all variables
+results = test_all_variables(Y_macro; test=:adf)
+
+println("\nUnit root test results:")
+println("-"^50)
+n_i1 = 0
+for (i, r) in enumerate(results)
+    status = r.pvalue > 0.05 ? "I(1)" : "I(0)"
+    n_i1 += r.pvalue > 0.05
+    println("  $(var_names[i]): p=$(round(r.pvalue, digits=3)) → $status")
+end
+
+println("\nSummary: $n_i1 of $(size(Y_macro, 2)) variables appear I(1)")
+
+# Recommendation
+if n_i1 == size(Y_macro, 2)
+    println("\nRecommendation: All variables I(1)")
+    println("  → Test for cointegration")
+    println("  → If cointegrated: use VECM")
+    println("  → If not: use VAR in first differences")
+elseif n_i1 == 0
+    println("\nRecommendation: All variables I(0)")
+    println("  → Use VAR in levels")
+else
+    println("\nRecommendation: Mixed I(0)/I(1)")
+    println("  → Consider ARDL bounds test")
+    println("  → Or difference I(1) variables")
+end
+```
+
+### Complete Pre-Estimation Workflow
+
+```julia
+# === Complete Workflow ===
+println("\n" * "="^60)
+println("Complete Pre-Estimation Workflow")
+println("="^60)
+
+function pre_estimation_analysis(Y; var_names=nothing, α=0.05)
+    T, n = size(Y)
+    var_names = isnothing(var_names) ? ["Var$i" for i in 1:n] : var_names
+
+    println("\n1. Individual Unit Root Tests")
+    println("-"^40)
+
+    integration_orders = zeros(Int, n)
+    for i in 1:n
+        adf = adf_test(Y[:, i]; lags=:aic)
+        kpss = kpss_test(Y[:, i])
+
+        if adf.pvalue < α && kpss.pvalue > α
+            integration_orders[i] = 0
+            status = "I(0)"
+        elseif adf.pvalue > α && kpss.pvalue < α
+            integration_orders[i] = 1
+            status = "I(1)"
+        else
+            integration_orders[i] = -1  # Inconclusive
+            status = "Inconclusive"
+        end
+        println("  $(var_names[i]): $status (ADF p=$(round(adf.pvalue, digits=3)), KPSS p=$(round(kpss.pvalue, digits=3)))")
+    end
+
+    n_i1 = sum(integration_orders .== 1)
+    n_i0 = sum(integration_orders .== 0)
+
+    println("\n2. Summary")
+    println("-"^40)
+    println("  I(0) variables: $n_i0")
+    println("  I(1) variables: $n_i1")
+    println("  Inconclusive: $(n - n_i0 - n_i1)")
+
+    # Cointegration test if all I(1)
+    if n_i1 >= 2
+        println("\n3. Cointegration Test")
+        println("-"^40)
+        joh = johansen_test(Y, 2)
+        println("  Estimated cointegration rank: ", joh.rank)
+
+        if joh.rank > 0
+            println("  → Cointegration detected")
+            println("  → Recommendation: VECM with rank=$(joh.rank)")
+        else
+            println("  → No cointegration")
+            println("  → Recommendation: VAR in first differences")
+        end
+    elseif n_i0 == n
+        println("\n3. Recommendation")
+        println("-"^40)
+        println("  All series stationary → VAR in levels")
+    end
+
+    return (integration_orders=integration_orders, n_i0=n_i0, n_i1=n_i1)
+end
+
+# Run complete analysis
+result = pre_estimation_analysis(Y_macro; var_names=var_names)
+```
+
+---
+
 ## Best Practices
 
 ### Data Preparation
 
-1. **Stationarity**: Ensure data is stationary (difference if needed)
-2. **Outliers**: Check for and handle outliers
-3. **Missing data**: Factor models can handle some missing data; VARs require complete data
-4. **Scaling**: For factor models, standardize variables
+1. **Stationarity**: Test for unit roots using ADF and KPSS together
+   - Both fail to reject → inconclusive, consider structural breaks
+   - ADF rejects, KPSS doesn't → stationary (I(0))
+   - ADF doesn't reject, KPSS rejects → unit root (I(1))
+2. **Structural Breaks**: Use Zivot-Andrews test if visual inspection suggests breaks
+3. **Cointegration**: For I(1) variables, test for cointegration before differencing
+4. **Outliers**: Check for and handle outliers
+5. **Missing data**: Factor models can handle some missing data; VARs require complete data
+6. **Scaling**: For factor models, standardize variables
 
 ### Model Selection
 

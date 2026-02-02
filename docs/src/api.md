@@ -54,6 +54,19 @@ MinnesotaHyperparameters
 AbstractPrior
 ```
 
+### Unit Root Test Types
+
+```@docs
+AbstractUnitRootTest
+ADFResult
+KPSSResult
+PPResult
+ZAResult
+NgPerronResult
+JohansenResult
+VARStationarityResult
+```
+
 ### SVAR Identification Types
 
 ```@docs
@@ -169,6 +182,16 @@ Order   = [:function]
 
 ---
 
+## Unit Root and Cointegration Tests
+
+```@autodocs
+Modules = [MacroEconometricModels]
+Pages   = ["unitroot.jl"]
+Order   = [:function]
+```
+
+---
+
 ## Utility Functions
 
 ```@autodocs
@@ -224,6 +247,20 @@ Order   = [:function]
 | `estimate_factors(X, r; ...)` | Estimate r-factor model |
 | `ic_criteria(X, r_max)` | Bai-Ng information criteria |
 | `scree_plot_data(model)` | Data for scree plot |
+
+### Unit Root Test Functions
+
+| Function | Description |
+|----------|-------------|
+| `adf_test(y; ...)` | Augmented Dickey-Fuller unit root test |
+| `kpss_test(y; ...)` | KPSS stationarity test |
+| `pp_test(y; ...)` | Phillips-Perron unit root test |
+| `za_test(y; ...)` | Zivot-Andrews structural break test |
+| `ngperron_test(y; ...)` | Ng-Perron unit root tests (MZα, MZt, MSB, MPT) |
+| `johansen_test(Y, p; ...)` | Johansen cointegration test |
+| `is_stationary(model)` | Check VAR model stationarity |
+| `unit_root_summary(y; ...)` | Run multiple tests with summary |
+| `test_all_variables(Y; ...)` | Apply test to all columns |
 
 ### Diagnostic Functions
 
@@ -296,4 +333,14 @@ AbstractGMMModel
 
 AbstractPrior
 └── MinnesotaHyperparameters{T}
+
+AbstractUnitRootTest <: StatsAPI.HypothesisTest
+├── ADFResult{T}
+├── KPSSResult{T}
+├── PPResult{T}
+├── ZAResult{T}
+├── NgPerronResult{T}
+└── JohansenResult{T}
+
+VARStationarityResult{T}
 ```

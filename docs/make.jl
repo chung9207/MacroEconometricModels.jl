@@ -18,10 +18,16 @@ makedocs(;
     ),
     pages=[
         "Home" => "index.md",
-        "by Subject" => [
-            "VAR & BVAR" => "manual.md",
+        "Frequentist Models" => [
+            "VAR" => "manual.md",
             "Local Projections" => "lp.md",
             "Factor Models" => "factormodels.md",
+        ],
+        "Bayesian Models" => [
+            "Bayesian VAR" => "bayesian.md",
+        ],
+        "Hypothesis Tests" => [
+            "Unit Root & Cointegration" => "hypothesis_tests.md",
         ],
         "Examples" => "examples.md",
         "API Reference" => "api.md",

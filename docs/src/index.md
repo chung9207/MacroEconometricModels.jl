@@ -12,9 +12,10 @@
 - **Structural Identification**: Multiple identification schemes including Cholesky, sign restrictions, long-run (Blanchard-Quah), and narrative restrictions
 - **Bayesian VAR**: Minnesota/Litterman prior with automatic hyperparameter optimization via marginal likelihood (Giannone, Lenza & Primiceri, 2015)
 - **Local Projections**: Jordà (2005) methodology with extensions for IV (Stock & Watson, 2018), smooth LP (Barnichon & Brownlees, 2019), state-dependence (Auerbach & Gorodnichenko, 2013), and propensity score methods (Angrist, Jordà & Kuersteiner, 2018)
-- **Factor Models**: Static factor estimation via PCA with Bai & Ng (2002) information criteria for determining the number of factors
+- **Factor Models**: Static, dynamic, and generalized dynamic factor models with Bai & Ng (2002) information criteria
+- **Hypothesis Tests**: Comprehensive unit root tests (ADF, KPSS, Phillips-Perron, Zivot-Andrews, Ng-Perron) and Johansen cointegration test
 - **GMM Estimation**: Flexible GMM framework with one-step, two-step, and iterated estimation
-- **Robust Inference**: Newey-West HAC standard errors with automatic bandwidth selection
+- **Robust Inference**: Newey-West, White, and Driscoll-Kraay HAC standard errors with automatic bandwidth selection
 
 ## Installation
 
@@ -111,6 +112,25 @@ fm = estimate_factors(X, r_optimal)
 factors = fm.factors
 ```
 
+### Unit Root Tests
+
+```julia
+using MacroEconometricModels
+
+# Test for unit root
+y = cumsum(randn(200))  # Random walk (has unit root)
+
+# Augmented Dickey-Fuller test
+adf_result = adf_test(y; lags=:aic, regression=:constant)
+
+# KPSS stationarity test (opposite null hypothesis)
+kpss_result = kpss_test(y; regression=:constant)
+
+# Johansen cointegration test for multivariate data
+Y = randn(200, 3)
+johansen_result = johansen_test(Y, 2; deterministic=:constant)
+```
+
 ## Package Structure
 
 The package is organized into the following modules:
@@ -125,7 +145,8 @@ The package is organized into the following modules:
 | `irf.jl` | Impulse response function computation |
 | `fevd.jl` | Forecast error variance decomposition |
 | `lp_*.jl` | Local Projections suite |
-| `factormodels.jl` | Static factor models |
+| `factormodels.jl` | Static, dynamic, and generalized dynamic factor models |
+| `unitroot.jl` | Unit root and cointegration tests (ADF, KPSS, PP, ZA, Ng-Perron, Johansen) |
 | `gmm.jl` | Generalized Method of Moments |
 | `utils.jl` | Numerical utilities |
 
@@ -193,6 +214,6 @@ Contributions are welcome! Please see the [GitHub repository](https://github.com
 ## Contents
 
 ```@contents
-Pages = ["manual.md", "lp.md", "factormodels.md", "api.md", "examples.md"]
+Pages = ["manual.md", "lp.md", "factormodels.md", "bayesian.md", "hypothesis_tests.md", "api.md", "examples.md"]
 Depth = 2
 ```
