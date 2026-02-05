@@ -9,6 +9,7 @@ Implements types for:
 - Propensity score LP (Angrist et al. 2018)
 
 Note: GMM types are defined in gmm.jl
+Note: Covariance estimator types are defined in covariance_estimators.jl
 """
 
 using LinearAlgebra, StatsAPI
@@ -23,65 +24,8 @@ abstract type AbstractLPModel <: StatsAPI.RegressionModel end
 """Abstract supertype for LP impulse response results."""
 abstract type AbstractLPImpulseResponse <: AbstractImpulseResponse end
 
-"""Abstract supertype for covariance estimators."""
-abstract type AbstractCovarianceEstimator end
-
-# =============================================================================
-# Covariance Estimator Types
-# =============================================================================
-
-"""
-    NeweyWestEstimator{T} <: AbstractCovarianceEstimator
-
-Newey-West HAC covariance estimator configuration.
-
-Fields:
-- bandwidth: Truncation lag (0 = automatic via Newey-West 1994 formula)
-- kernel: Kernel function (:bartlett, :parzen, :quadratic_spectral)
-- prewhiten: Use AR(1) prewhitening
-"""
-struct NeweyWestEstimator{T<:AbstractFloat} <: AbstractCovarianceEstimator
-    bandwidth::Int
-    kernel::Symbol
-    prewhiten::Bool
-
-    function NeweyWestEstimator{T}(bandwidth::Int=0, kernel::Symbol=:bartlett,
-                                    prewhiten::Bool=false) where {T<:AbstractFloat}
-        bandwidth < 0 && throw(ArgumentError("bandwidth must be non-negative"))
-        kernel ∉ (:bartlett, :parzen, :quadratic_spectral, :tukey_hanning) &&
-            throw(ArgumentError("kernel must be :bartlett, :parzen, :quadratic_spectral, or :tukey_hanning"))
-        new{T}(bandwidth, kernel, prewhiten)
-    end
-end
-
-NeweyWestEstimator(; bandwidth::Int=0, kernel::Symbol=:bartlett, prewhiten::Bool=false) =
-    NeweyWestEstimator{Float64}(bandwidth, kernel, prewhiten)
-
-"""
-    WhiteEstimator <: AbstractCovarianceEstimator
-
-White heteroscedasticity-robust covariance estimator (HC0).
-Does not correct for serial correlation.
-"""
-struct WhiteEstimator <: AbstractCovarianceEstimator end
-
-"""
-    DriscollKraayEstimator{T} <: AbstractCovarianceEstimator
-
-Driscoll-Kraay standard errors for panel data with cross-sectional dependence.
-"""
-struct DriscollKraayEstimator{T<:AbstractFloat} <: AbstractCovarianceEstimator
-    bandwidth::Int
-    kernel::Symbol
-
-    function DriscollKraayEstimator{T}(bandwidth::Int=0, kernel::Symbol=:bartlett) where {T<:AbstractFloat}
-        bandwidth < 0 && throw(ArgumentError("bandwidth must be non-negative"))
-        new{T}(bandwidth, kernel)
-    end
-end
-
-DriscollKraayEstimator(; bandwidth::Int=0, kernel::Symbol=:bartlett) =
-    DriscollKraayEstimator{Float64}(bandwidth, kernel)
+# Note: AbstractCovarianceEstimator and its subtypes (NeweyWestEstimator, WhiteEstimator,
+# DriscollKraayEstimator) are now defined in covariance_estimators.jl
 
 # =============================================================================
 # Core LP Model Type (Jordà 2005)

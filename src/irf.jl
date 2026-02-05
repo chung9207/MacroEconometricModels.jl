@@ -100,33 +100,32 @@ end
     irf(chain, p, n, horizon; method=:cholesky, quantiles=[0.16, 0.5, 0.84], ...)
 
 Compute Bayesian IRFs from MCMC chain with posterior quantiles.
+
+Uses `process_posterior_samples` and `compute_posterior_quantiles` from bayesian_utils.jl.
 """
 function irf(chain::Chains, p::Int, n::Int, horizon::Int;
     method::Symbol=:cholesky, data::AbstractMatrix=Matrix{Float64}(undef, 0, 0),
-    check_func=nothing, narrative_check=nothing, quantiles::Vector{<:Real}=[0.16, 0.5, 0.84]
+    check_func=nothing, narrative_check=nothing, quantiles::Vector{<:Real}=[0.16, 0.5, 0.84],
+    threaded::Bool=false
 )
     method == :narrative && isempty(data) && throw(ArgumentError("Narrative needs data"))
 
-    samples = size(chain, 1)
     ET = isempty(data) ? Float64 : eltype(data)
-    all_irfs = zeros(ET, samples, horizon, n, n)
 
-    b_vecs, sigmas = extract_chain_parameters(chain)
-    for s in 1:samples
-        m = parameters_to_model(b_vecs[s, :], sigmas[s, :], p, n, data)
-        Q = compute_Q(m, method, horizon, check_func, narrative_check; max_draws=100)
-        all_irfs[s, :, :, :] = compute_irf(m, Q, horizon)
-    end
+    # Process posterior samples using shared utility
+    results, samples = process_posterior_samples(chain, p, n,
+        (m, Q, h) -> compute_irf(m, Q, h);
+        data=data, method=method, horizon=horizon,
+        check_func=check_func, narrative_check=narrative_check
+    )
 
+    # Stack results into single array
+    all_irfs = stack_posterior_results(results, (horizon, n, n), ET)
+
+    # Compute quantiles using shared utility (threaded for large arrays)
     q_vec = ET.(quantiles)
-    irf_q = zeros(ET, horizon, n, n, length(quantiles))
-    irf_m = zeros(ET, horizon, n, n)
-
-    @inbounds for h in 1:horizon, v in 1:n, sh in 1:n
-        d = @view all_irfs[:, h, v, sh]
-        irf_q[h, v, sh, :] = quantile(d, q_vec)
-        irf_m[h, v, sh] = mean(d)
-    end
+    use_threaded = threaded || (samples * horizon * n * n > 100000)
+    irf_q, irf_m = compute_posterior_quantiles(all_irfs, q_vec; threaded=use_threaded)
 
     BayesianImpulseResponse{ET}(irf_q, irf_m, horizon, default_var_names(n), default_shock_names(n), q_vec)
 end

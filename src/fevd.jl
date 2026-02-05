@@ -49,35 +49,41 @@ end
     fevd(chain, p, n, horizon; quantiles=[0.16, 0.5, 0.84], ...) -> BayesianFEVD
 
 Compute Bayesian FEVD from MCMC chain with posterior quantiles.
+
+Uses `process_posterior_samples` and `compute_posterior_quantiles` from bayesian_utils.jl.
 """
 function fevd(chain::Chains, p::Int, n::Int, horizon::Int;
     method::Symbol=:cholesky, data::AbstractMatrix=Matrix{Float64}(undef, 0, 0),
-    check_func=nothing, narrative_check=nothing, quantiles::Vector{<:Real}=[0.16, 0.5, 0.84]
+    check_func=nothing, narrative_check=nothing, quantiles::Vector{<:Real}=[0.16, 0.5, 0.84],
+    threaded::Bool=false
 )
     method == :narrative && isempty(data) && throw(ArgumentError("Narrative needs data"))
 
-    samples = size(chain, 1)
     ET = isempty(data) ? Float64 : eltype(data)
-    all_fevds = zeros(ET, samples, n, n, horizon)
 
-    b_vecs, sigmas = extract_chain_parameters(chain)
-    for s in 1:samples
-        m = parameters_to_model(b_vecs[s, :], sigmas[s, :], p, n, data)
-        Q = compute_Q(m, method, horizon, check_func, narrative_check; max_draws=100)
-        irf_vals = compute_irf(m, Q, horizon)
-        _, props = _compute_fevd(irf_vals, n, horizon)
-        all_fevds[s, :, :, :] = props
+    # Process posterior samples - compute FEVD proportions for each
+    results, samples = process_posterior_samples(chain, p, n,
+        (m, Q, h) -> begin
+            irf_vals = compute_irf(m, Q, h)
+            _, props = _compute_fevd(irf_vals, nvars(m), h)
+            props  # Returns (n, n, horizon)
+        end;
+        data=data, method=method, horizon=horizon,
+        check_func=check_func, narrative_check=narrative_check
+    )
+
+    # Stack results: samples are (n, n, horizon), need to rearrange to (horizon, n, n) for output
+    all_fevds = zeros(ET, samples, horizon, n, n)
+    @inbounds for s in 1:samples
+        for h in 1:horizon, v in 1:n, sh in 1:n
+            all_fevds[s, h, v, sh] = results[s][v, sh, h]
+        end
     end
 
+    # Compute quantiles using shared utility
     q_vec = ET.(quantiles)
-    fevd_q = zeros(ET, horizon, n, n, length(quantiles))
-    fevd_m = zeros(ET, horizon, n, n)
-
-    @inbounds for h in 1:horizon, v in 1:n, sh in 1:n
-        d = @view all_fevds[:, v, sh, h]
-        fevd_q[h, v, sh, :] = quantile(d, q_vec)
-        fevd_m[h, v, sh] = mean(d)
-    end
+    use_threaded = threaded || (samples * horizon * n * n > 100000)
+    fevd_q, fevd_m = compute_posterior_quantiles(all_fevds, q_vec; threaded=use_threaded)
 
     BayesianFEVD{ET}(fevd_q, fevd_m, horizon, default_var_names(n), default_shock_names(n), q_vec)
 end

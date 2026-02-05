@@ -81,15 +81,24 @@ include("unitroot.jl")
 # Structural analysis
 include("identification.jl")
 
-# Factor models (static, dynamic, generalized dynamic)
-include("factormodels.jl")
+# Bayesian processing utilities (after bayesian.jl and identification.jl)
+include("bayesian_utils.jl")
+
+# Factor models (split into separate files for modularity)
+include("kalman.jl")           # Kalman filter/smoother utilities
+include("staticfactor.jl")     # Static factor model (PCA)
+include("dynamicfactor.jl")    # Dynamic factor model with EM
+include("generalizedfactor.jl") # Generalized dynamic factor model (spectral)
 
 # GMM estimation (includes GMM types)
 include("gmm.jl")
 
+# Covariance estimators (shared by LP, GMM, etc.)
+include("covariance_estimators.jl")
+
 # Local Projections (consolidated structure)
 include("lp_types.jl")      # LP type definitions
-include("lp_core.jl")       # Covariance estimators + core LP + shared utilities
+include("lp_core.jl")       # Core LP estimation + shared utilities
 include("lp_extensions.jl") # LP-IV, Smooth LP, State LP, Propensity LP
 
 # IRF and FEVD (after LP types for lp_irf support)
@@ -105,6 +114,7 @@ include("summary.jl")
 # =============================================================================
 
 # Abstract types
+export AbstractAnalysisResult, AbstractFrequentistResult, AbstractBayesianResult
 export AbstractVARModel, AbstractImpulseResponse, AbstractFEVD, AbstractPrior
 
 # VAR types
@@ -168,6 +178,13 @@ export parameters_to_model
 export posterior_mean_model
 export posterior_median_model
 
+# Bayesian processing utilities
+export process_posterior_samples
+export compute_posterior_quantiles, compute_posterior_quantiles!
+export compute_posterior_quantiles_threaded!
+export compute_weighted_quantiles!, compute_weighted_quantiles_threaded!
+export stack_posterior_results
+
 # =============================================================================
 # Exports - Prior Functions
 # =============================================================================
@@ -213,10 +230,11 @@ export historical_decomposition
 export contribution, total_shock_contribution, verify_decomposition
 
 # =============================================================================
-# Exports - Summary Tables
+# Exports - Summary Tables and Result Interface
 # =============================================================================
 
 export summary, table, print_table
+export point_estimate, has_uncertainty, uncertainty_bounds
 
 # =============================================================================
 # Exports - Factor Models
@@ -262,7 +280,7 @@ export estimate_lp_multi, estimate_lp_cholesky, compare_var_lp
 
 # HAC covariance estimators
 export newey_west, white_vcov, driscoll_kraay, optimal_bandwidth_nw, kernel_weight
-export robust_vcov, long_run_variance, long_run_covariance
+export robust_vcov, long_run_variance, long_run_covariance, precompute_XtX_inv
 
 # LP-IV (Stock & Watson 2018)
 export estimate_lp_iv, lp_iv_irf

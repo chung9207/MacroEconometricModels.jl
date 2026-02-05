@@ -16,6 +16,7 @@ using Test
     @testset "Bayesian Estimation" begin
         include("test_bayesian.jl")
         include("test_samplers.jl") # Added sampler tests
+        include("test_bayesian_utils.jl") # Bayesian processing utilities
     end
 
     @testset "Impulse Response Functions" begin
@@ -69,6 +70,10 @@ using Test
 
     @testset "Utility Functions" begin
         include("test_utils.jl")
+    end
+
+    @testset "Edge Cases" begin
+        include("test_edge_cases.jl")
     end
 
     @testset "Documentation Examples" begin

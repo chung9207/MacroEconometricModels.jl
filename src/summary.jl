@@ -5,9 +5,83 @@ Provides a unified interface using multiple dispatch:
 - `summary(result)` - Print comprehensive summary
 - `table(result, ...)` - Extract data as matrix
 - `print_table(result, ...)` - Print formatted table
+
+Also provides common interface methods for all analysis results:
+- `point_estimate(result)` - Get point estimate
+- `has_uncertainty(result)` - Check if uncertainty bounds available
+- `uncertainty_bounds(result)` - Get (lower, upper) bounds if available
 """
 
 using PrettyTables, LinearAlgebra, Statistics
+
+# =============================================================================
+# Unified Result Interface - Common Accessors
+# =============================================================================
+
+"""
+    point_estimate(result::AbstractAnalysisResult)
+
+Get the point estimate from an analysis result.
+
+Returns the main values/estimates (IRF values, FEVD proportions, HD contributions).
+"""
+point_estimate(r::AbstractAnalysisResult) = error("point_estimate not implemented for $(typeof(r))")
+
+"""
+    has_uncertainty(result::AbstractAnalysisResult) -> Bool
+
+Check if the result includes uncertainty quantification (confidence intervals or posterior quantiles).
+"""
+has_uncertainty(r::AbstractAnalysisResult) = false
+
+"""
+    uncertainty_bounds(result::AbstractAnalysisResult) -> Union{Nothing, Tuple}
+
+Get uncertainty bounds (lower, upper) if available, otherwise nothing.
+"""
+uncertainty_bounds(r::AbstractAnalysisResult) = nothing
+
+# --- ImpulseResponse implementations ---
+
+point_estimate(r::ImpulseResponse) = r.values
+has_uncertainty(r::ImpulseResponse) = r.ci_type != :none
+function uncertainty_bounds(r::ImpulseResponse)
+    r.ci_type == :none && return nothing
+    (r.ci_lower, r.ci_upper)
+end
+
+point_estimate(r::BayesianImpulseResponse) = r.mean
+has_uncertainty(r::BayesianImpulseResponse) = true
+function uncertainty_bounds(r::BayesianImpulseResponse)
+    nq = length(r.quantile_levels)
+    (r.quantiles[:,:,:,1], r.quantiles[:,:,:,nq])
+end
+
+# --- FEVD implementations ---
+
+point_estimate(r::FEVD) = r.proportions
+has_uncertainty(r::FEVD) = false
+uncertainty_bounds(r::FEVD) = nothing
+
+point_estimate(r::BayesianFEVD) = r.mean
+has_uncertainty(r::BayesianFEVD) = true
+function uncertainty_bounds(r::BayesianFEVD)
+    nq = length(r.quantile_levels)
+    (r.quantiles[:,:,:,1], r.quantiles[:,:,:,nq])
+end
+
+# --- HistoricalDecomposition implementations ---
+
+point_estimate(r::HistoricalDecomposition) = r.contributions
+has_uncertainty(r::HistoricalDecomposition) = false
+uncertainty_bounds(r::HistoricalDecomposition) = nothing
+
+point_estimate(r::BayesianHistoricalDecomposition) = r.mean
+has_uncertainty(r::BayesianHistoricalDecomposition) = true
+function uncertainty_bounds(r::BayesianHistoricalDecomposition)
+    nq = length(r.quantile_levels)
+    (r.quantiles[:,:,:,1], r.quantiles[:,:,:,nq])
+end
 
 # =============================================================================
 # Table Formatting

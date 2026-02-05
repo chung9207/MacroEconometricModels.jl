@@ -13,7 +13,7 @@ using LinearAlgebra, Statistics, MCMCChains, PrettyTables
 # =============================================================================
 
 """Abstract supertype for historical decomposition results."""
-abstract type AbstractHistoricalDecomposition end
+abstract type AbstractHistoricalDecomposition <: AbstractAnalysisResult end
 
 # =============================================================================
 # Result Types
@@ -84,21 +84,16 @@ end
 """
 Compute structural MA coefficients Θ_s = Φ_s * P for s = 0, ..., horizon-1.
 Returns Vector{Matrix{T}} of length horizon.
+
+Uses `_compute_ma_coefficients` from identification.jl to avoid code duplication.
 """
 function _compute_structural_ma_coefficients(model::VARModel{T}, Q::AbstractMatrix{T},
                                               horizon::Int) where {T<:AbstractFloat}
-    n, p = nvars(model), model.p
     L = safe_cholesky(model.Sigma)
     P = L * Q  # Impact matrix
 
-    # Compute reduced-form MA coefficients Φ_s
-    A = extract_ar_coefficients(model.B, n, p)
-    Phi = Vector{Matrix{T}}(undef, horizon)
-    Phi[1] = Matrix{T}(I, n, n)
-
-    @inbounds for s in 2:horizon
-        Phi[s] = sum(A[j] * Phi[s-j] for j in 1:min(p, s-1); init=zeros(T, n, n))
-    end
+    # Reuse existing function from identification.jl (returns Phi[1:horizon] with 0-indexing convention)
+    Phi = _compute_ma_coefficients(model, horizon - 1)
 
     # Structural MA coefficients: Θ_s = Φ_s * P
     [Phi[s] * P for s in 1:horizon]
