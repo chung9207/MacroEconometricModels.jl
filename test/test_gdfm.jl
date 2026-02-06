@@ -321,11 +321,11 @@ using Random
         fc = forecast(model, h; method=:ar)
 
         # Dimension checks
-        @test size(fc.common) == (h, N)
+        @test size(fc.observables) == (h, N)
         @test size(fc.factors) == (h, q)
 
         # Forecasts should be finite
-        @test all(isfinite, fc.common)
+        @test all(isfinite, fc.observables)
         @test all(isfinite, fc.factors)
     end
 
@@ -339,11 +339,11 @@ using Random
 
         # AR method
         fc_ar = forecast(model, h; method=:ar)
-        @test size(fc_ar.common) == (h, N)
+        @test size(fc_ar.observables) == (h, N)
 
         # Spectral method
         fc_spectral = forecast(model, h; method=:spectral)
-        @test size(fc_spectral.common) == (h, N)
+        @test size(fc_spectral.observables) == (h, N)
     end
 
     @testset "Forecast with Dynamic Factors" begin

@@ -139,7 +139,7 @@ export FEVD, BayesianFEVD
 export MinnesotaHyperparameters
 
 # Factor model types
-export AbstractFactorModel, FactorModel, DynamicFactorModel, GeneralizedDynamicFactorModel
+export AbstractFactorModel, FactorModel, DynamicFactorModel, GeneralizedDynamicFactorModel, FactorForecast
 
 # Local Projection types
 export AbstractLPModel, AbstractLPImpulseResponse, AbstractCovarianceEstimator

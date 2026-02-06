@@ -152,3 +152,105 @@ data = scree_plot_data(fm)
 """
 scree_plot_data(m::FactorModel) = (factors=1:length(m.eigenvalues), explained_variance=m.explained_variance,
                                     cumulative_variance=m.cumulative_variance)
+
+# =============================================================================
+# Forecasting
+# =============================================================================
+
+"""
+    forecast(model::FactorModel, h; p=1, ci_method=:none, conf_level=0.95, n_boot=1000)
+
+Forecast factors and observables h steps ahead from a static factor model.
+
+Internally fits a VAR(p) on the extracted factors, then uses the VAR dynamics
+to produce multi-step forecasts and (optionally) confidence intervals.
+
+# Arguments
+- `model`: Estimated static factor model
+- `h`: Forecast horizon
+
+# Keyword Arguments
+- `p::Int=1`: VAR lag order for factor dynamics
+- `ci_method::Symbol=:none`: CI method — `:none`, `:theoretical`, or `:bootstrap`
+- `conf_level::Real=0.95`: Confidence level for intervals
+- `n_boot::Int=1000`: Number of bootstrap replications (if `ci_method=:bootstrap`)
+
+# Returns
+`FactorForecast` with factor and observable forecasts (and CIs if requested).
+"""
+function forecast(m::FactorModel{T}, h::Int; p::Int=1, ci_method::Symbol=:none,
+    conf_level::Real=0.95, n_boot::Int=1000) where {T}
+
+    h < 1 && throw(ArgumentError("h must be ≥ 1"))
+    p < 1 && throw(ArgumentError("p must be ≥ 1"))
+    ci_method ∈ (:none, :theoretical, :bootstrap) || throw(ArgumentError("ci_method must be :none, :theoretical, or :bootstrap"))
+
+    r = m.r
+    T_obs, N = size(m.X)
+    F = m.factors
+    Lambda = m.loadings
+
+    # Fit VAR(p) on extracted factors
+    var_model = estimate_var(F, p)
+    A = [Matrix{T}(var_model.B[(2+(lag-1)*r):(1+lag*r), :]') for lag in 1:p]
+    Sigma_eta = var_model.Sigma
+
+    # Idiosyncratic covariance from PCA residuals
+    X_proc = m.standardized ? _standardize(m.X) : m.X
+    e = X_proc - F * Lambda'
+    Sigma_e = diagm(vec(var(e, dims=1)))
+
+    # Last p factor vectors (most recent first)
+    F_last = [F[T_obs-lag+1, :] for lag in 1:p]
+
+    # Point forecasts
+    F_fc = zeros(T, h, r)
+    X_fc = zeros(T, h, N)
+    for step in 1:h
+        F_h = sum(A[lag] * (step - lag >= 1 ? F_fc[step - lag, :] : F_last[lag - step + 1]) for lag in 1:p)
+        F_fc[step, :] = F_h
+        X_fc[step, :] = Lambda * F_h
+    end
+
+    conf_T = T(conf_level)
+
+    if ci_method == :none
+        z = zeros(T, h, r)
+        zx = zeros(T, h, N)
+        if m.standardized
+            _unstandardize_factor_forecast!(X_fc, zx, zx, zx, m.X)
+        end
+        return _build_factor_forecast(F_fc, X_fc, z, z, zx, copy(zx), z, copy(zx), h, conf_T, :none)
+    end
+
+    if ci_method == :theoretical
+        factor_mse = _factor_forecast_var_theoretical(A, Sigma_eta, r, p, h)
+        z_val = T(quantile(Normal(), 1 - (1 - conf_level) / 2))
+
+        F_se = Matrix{T}(undef, h, r)
+        for step in 1:h
+            F_se[step, :] = sqrt.(max.(diag(factor_mse[step]), zero(T)))
+        end
+        F_lo = F_fc .- z_val .* F_se
+        F_hi = F_fc .+ z_val .* F_se
+
+        X_se = _factor_forecast_obs_se(factor_mse, Lambda, Sigma_e, h)
+        X_lo = X_fc .- z_val .* X_se
+        X_hi = X_fc .+ z_val .* X_se
+
+        if m.standardized
+            _unstandardize_factor_forecast!(X_fc, X_lo, X_hi, X_se, m.X)
+        end
+        return _build_factor_forecast(F_fc, X_fc, F_lo, F_hi, X_lo, X_hi, F_se, X_se, h, conf_T, :theoretical)
+    end
+
+    # Bootstrap
+    factor_resids = var_model.U
+    f_lo, f_hi, o_lo, o_hi, f_se, o_se = _factor_forecast_bootstrap(
+        F_last, A, factor_resids, Sigma_e, Lambda, h, r, p, n_boot, conf_T)
+
+    if m.standardized
+        _unstandardize_factor_forecast!(X_fc, o_lo, o_hi, o_se, m.X)
+    end
+    _build_factor_forecast(F_fc, X_fc, f_lo, f_hi, o_lo, o_hi, f_se, o_se, h, conf_T, :bootstrap)
+end

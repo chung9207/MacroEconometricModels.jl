@@ -273,7 +273,7 @@ end
 # =============================================================================
 
 """
-    forecast(model::GeneralizedDynamicFactorModel, h; method=:ar) -> (common, factors)
+    forecast(model::GeneralizedDynamicFactorModel, h; method=:ar, ci_method=:none, conf_level=0.95, n_boot=1000)
 
 Forecast h steps ahead using AR extrapolation of factors.
 
@@ -282,20 +282,130 @@ Forecast h steps ahead using AR extrapolation of factors.
 - `h`: Forecast horizon
 
 # Keyword Arguments
-- `method::Symbol=:ar`: Forecasting method (currently only :ar supported)
+- `method::Symbol=:ar`: Forecasting method (currently only `:ar` supported)
+- `ci_method::Symbol=:none`: CI method — `:none`, `:theoretical`, or `:bootstrap`
+- `conf_level::Real=0.95`: Confidence level for intervals
+- `n_boot::Int=1000`: Bootstrap replications (for `:bootstrap`)
 
 # Returns
-Named tuple with forecasted common component and factors.
+`FactorForecast` with factor and observable forecasts (and CIs if requested).
 """
-function forecast(model::GeneralizedDynamicFactorModel{T}, h::Int; method::Symbol=:ar) where {T}
+function forecast(model::GeneralizedDynamicFactorModel{T}, h::Int; method::Symbol=:ar,
+    ci_method::Symbol=:none, conf_level::Real=0.95, n_boot::Int=1000) where {T}
+
     h < 1 && throw(ArgumentError("h must be positive"))
     method ∉ (:ar, :spectral) && throw(ArgumentError("method must be :ar or :spectral"))
+    ci_method ∈ (:none, :theoretical, :bootstrap) || throw(ArgumentError("ci_method must be :none, :theoretical, or :bootstrap"))
 
-    factors_fc = _forecast_factors_ar(model.factors, h)
+    q = model.q
+    factors = model.factors
     L_avg = real.(model.loadings_spectral[:, :, 1])
-    common_fc = factors_fc * L_avg'
+    N = size(model.X, 2)
+    T_obs = size(factors, 1)
 
-    (common=common_fc, factors=factors_fc)
+    # Fit AR(1) per factor and compute forecasts
+    phi = Vector{T}(undef, q)
+    sigma2 = Vector{T}(undef, q)
+    F_fc = Matrix{T}(undef, h, q)
+
+    for i in 1:q
+        F_i = factors[:, i]
+        phi[i] = dot(F_i[1:end-1], F_i[2:end]) / dot(F_i[1:end-1], F_i[1:end-1])
+        resid_i = F_i[2:end] .- phi[i] .* F_i[1:end-1]
+        sigma2[i] = var(resid_i)
+        f = F_i[end]
+        for t in 1:h
+            f = phi[i] * f
+            F_fc[t, i] = f
+        end
+    end
+
+    X_fc = F_fc * L_avg'
+    conf_T = T(conf_level)
+
+    # Idiosyncratic variance (diagonal)
+    idio_var = vec(var(model.idiosyncratic, dims=1))
+
+    if ci_method == :none
+        z = zeros(T, h, q)
+        zx = zeros(T, h, N)
+        if model.standardized
+            _unstandardize_factor_forecast!(X_fc, zx, zx, zx, model.X)
+        end
+        return _build_factor_forecast(F_fc, X_fc, z, z, zx, copy(zx), z, copy(zx), h, conf_T, :none)
+    end
+
+    if ci_method == :theoretical
+        z_val = T(quantile(Normal(), 1 - (1 - conf_level) / 2))
+
+        # Closed-form AR(1) forecast variance: σ² Σ_{j=0}^{h-1} φ^{2j}
+        F_se = Matrix{T}(undef, h, q)
+        for step in 1:h
+            for i in 1:q
+                fvar = sigma2[i] * sum(phi[i]^(2j) for j in 0:(step-1))
+                F_se[step, i] = sqrt(max(fvar, zero(T)))
+            end
+        end
+        F_lo = F_fc .- z_val .* F_se
+        F_hi = F_fc .+ z_val .* F_se
+
+        # Observable SE: L_avg * diag(factor_var) * L_avg' + diag(idio_var)
+        X_se = Matrix{T}(undef, h, N)
+        for step in 1:h
+            fvar_diag = [sigma2[i] * sum(phi[i]^(2j) for j in 0:(step-1)) for i in 1:q]
+            obs_var = L_avg * Diagonal(fvar_diag) * L_avg'
+            X_se[step, :] = sqrt.(max.(diag(obs_var) .+ idio_var, zero(T)))
+        end
+        X_lo = X_fc .- z_val .* X_se
+        X_hi = X_fc .+ z_val .* X_se
+
+        if model.standardized
+            _unstandardize_factor_forecast!(X_fc, X_lo, X_hi, X_se, model.X)
+        end
+        return _build_factor_forecast(F_fc, X_fc, F_lo, F_hi, X_lo, X_hi, F_se, X_se, h, conf_T, :theoretical)
+    end
+
+    # Bootstrap: resample AR(1) residuals per factor
+    F_boot = zeros(T, n_boot, h, q)
+    X_boot = zeros(T, n_boot, h, N)
+
+    # Pre-compute residuals per factor
+    resids_per_factor = [factors[2:end, i] .- phi[i] .* factors[1:end-1, i] for i in 1:q]
+    idio_std = sqrt.(max.(idio_var, zero(T)))
+
+    for b in 1:n_boot
+        for i in 1:q
+            f = factors[end, i]
+            for t in 1:h
+                boot_idx = rand(1:(T_obs-1))
+                f = phi[i] * f + resids_per_factor[i][boot_idx]
+                F_boot[b, t, i] = f
+            end
+        end
+        for t in 1:h
+            X_boot[b, t, :] = L_avg * F_boot[b, t, :] .+ idio_std .* randn(T, N)
+        end
+    end
+
+    if model.standardized
+        μ = vec(mean(model.X, dims=1))
+        σ = max.(vec(std(model.X, dims=1)), T(1e-10))
+        X_fc .= X_fc .* σ' .+ μ'
+        for b in 1:n_boot
+            X_boot[b, :, :] = X_boot[b, :, :] .* σ' .+ μ'
+        end
+    end
+
+    α_lo = (1 - conf_level) / 2
+    α_hi = 1 - α_lo
+    f_lo = T[quantile(F_boot[:, hh, j], α_lo) for hh in 1:h, j in 1:q]
+    f_hi = T[quantile(F_boot[:, hh, j], α_hi) for hh in 1:h, j in 1:q]
+    o_lo = T[quantile(X_boot[:, hh, j], α_lo) for hh in 1:h, j in 1:N]
+    o_hi = T[quantile(X_boot[:, hh, j], α_hi) for hh in 1:h, j in 1:N]
+    f_se = T[std(F_boot[:, hh, j]) for hh in 1:h, j in 1:q]
+    o_se = T[std(X_boot[:, hh, j]) for hh in 1:h, j in 1:N]
+
+    _build_factor_forecast(F_fc, X_fc, f_lo, f_hi, o_lo, o_hi, f_se, o_se, h, conf_T, :bootstrap)
 end
 
 """AR(1) forecast for each factor series."""

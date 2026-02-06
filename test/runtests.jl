@@ -60,6 +60,10 @@ using Test
         include("test_gdfm.jl")
     end
 
+    @testset "Factor Model Forecasting" begin
+        include("test_factor_forecast.jl")
+    end
+
     @testset "Arias et al. (2018) SVAR Identification" begin
         include("test_arias2018.jl")
     end

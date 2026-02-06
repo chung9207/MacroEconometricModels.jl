@@ -257,7 +257,7 @@ StatsAPI.bic(m::DynamicFactorModel) = -2m.loglik + dof(m) * log(nobs(m))
 # =============================================================================
 
 """
-    forecast(model::DynamicFactorModel, h; ci=false, ci_level=0.95)
+    forecast(model::DynamicFactorModel, h; ci_method=:none, conf_level=0.95, n_boot=1000, ci=false, ci_level=0.95)
 
 Forecast factors and observables h steps ahead.
 
@@ -266,70 +266,122 @@ Forecast factors and observables h steps ahead.
 - `h`: Forecast horizon
 
 # Keyword Arguments
-- `ci::Bool=false`: Compute confidence intervals via simulation
-- `ci_level::Real=0.95`: Confidence level for intervals
+- `ci_method::Symbol=:none`: CI method — `:none`, `:theoretical`, `:bootstrap`, or `:simulation`
+- `conf_level::Real=0.95`: Confidence level for intervals
+- `n_boot::Int=1000`: Bootstrap replications (for `:bootstrap` and `:simulation`)
+- `ci::Bool=false`: Legacy keyword — `ci=true` maps to `ci_method=:simulation`
+- `ci_level::Real=0.95`: Legacy keyword — maps to `conf_level`
 
 # Returns
-Named tuple with forecasts (and optionally CI bounds).
+`FactorForecast` with factor and observable forecasts (and CIs if requested).
 
 # Example
 ```julia
-fc = forecast(dfm, 12)
-fc.observables  # T×N matrix of forecasts
+fc = forecast(dfm, 12; ci_method=:theoretical)
+fc.observables       # h×N matrix of forecasts
+fc.observables_lower # h×N lower CI bounds
 ```
 """
-function forecast(m::DynamicFactorModel{T}, h::Int; ci::Bool=false, ci_level::Real=0.95) where {T}
+function forecast(m::DynamicFactorModel{T}, h::Int; ci_method::Symbol=:none,
+    conf_level::Real=0.95, n_boot::Int=1000,
+    ci::Bool=false, ci_level::Real=0.95) where {T}
+
     h < 1 && throw(ArgumentError("h must be ≥ 1"))
+
+    # Legacy compat: ci=true maps to :simulation
+    if ci && ci_method == :none
+        ci_method = :simulation
+        conf_level = ci_level
+    end
+    ci_method ∈ (:none, :theoretical, :bootstrap, :simulation) || throw(ArgumentError("ci_method must be :none, :theoretical, :bootstrap, or :simulation"))
 
     r, p, T_obs, N = m.r, m.p, size(m.X, 1), size(m.X, 2)
     F_last = [m.factors[T_obs-lag+1, :] for lag in 1:p]
 
     # Point forecasts
     F_fc, X_fc = zeros(T, h, r), zeros(T, h, N)
-    for horizon in 1:h
-        F_h = sum(m.A[lag] * (horizon-lag >= 1 ? F_fc[horizon-lag, :] : F_last[lag-horizon+1]) for lag in 1:p)
-        F_fc[horizon, :] = F_h
-        X_fc[horizon, :] = m.loadings * F_h
+    for step in 1:h
+        F_h = sum(m.A[lag] * (step - lag >= 1 ? F_fc[step - lag, :] : F_last[lag - step + 1]) for lag in 1:p)
+        F_fc[step, :] = F_h
+        X_fc[step, :] = m.loadings * F_h
     end
 
-    # Unstandardize if needed
-    if m.standardized
-        μ, σ = vec(mean(m.X, dims=1)), max.(vec(std(m.X, dims=1)), T(1e-10))
-        X_fc = X_fc .* σ' .+ μ'
+    conf_T = T(conf_level)
+
+    if ci_method == :none
+        z = zeros(T, h, r)
+        zx = zeros(T, h, N)
+        if m.standardized
+            _unstandardize_factor_forecast!(X_fc, zx, zx, zx, m.X)
+        end
+        return _build_factor_forecast(F_fc, X_fc, z, z, zx, copy(zx), z, copy(zx), h, conf_T, :none)
     end
 
-    !ci && return (factors=F_fc, observables=X_fc)
+    if ci_method == :theoretical
+        factor_mse = _factor_forecast_var_theoretical(m.A, m.Sigma_eta, r, p, h)
+        z_val = T(quantile(Normal(), 1 - (1 - conf_level) / 2))
 
-    # Simulation-based confidence intervals
-    n_sim = 1000
+        F_se = Matrix{T}(undef, h, r)
+        for step in 1:h
+            F_se[step, :] = sqrt.(max.(diag(factor_mse[step]), zero(T)))
+        end
+        F_lo = F_fc .- z_val .* F_se
+        F_hi = F_fc .+ z_val .* F_se
+
+        X_se = _factor_forecast_obs_se(factor_mse, m.loadings, m.Sigma_e, h)
+        X_lo = X_fc .- z_val .* X_se
+        X_hi = X_fc .+ z_val .* X_se
+
+        if m.standardized
+            _unstandardize_factor_forecast!(X_fc, X_lo, X_hi, X_se, m.X)
+        end
+        return _build_factor_forecast(F_fc, X_fc, F_lo, F_hi, X_lo, X_hi, F_se, X_se, h, conf_T, :theoretical)
+    end
+
+    if ci_method == :bootstrap
+        factor_resids = m.factor_residuals
+        Sigma_e = m.Sigma_e
+        f_lo, f_hi, o_lo, o_hi, f_se, o_se = _factor_forecast_bootstrap(
+            F_last, m.A, factor_resids, Sigma_e, m.loadings, h, r, p, n_boot, conf_T)
+
+        if m.standardized
+            _unstandardize_factor_forecast!(X_fc, o_lo, o_hi, o_se, m.X)
+        end
+        return _build_factor_forecast(F_fc, X_fc, f_lo, f_hi, o_lo, o_hi, f_se, o_se, h, conf_T, :bootstrap)
+    end
+
+    # :simulation — original Monte Carlo method
+    n_sim = n_boot
     L_eta = safe_cholesky(m.Sigma_eta)
     L_e = safe_cholesky(m.Sigma_e)
 
     F_sims, X_sims = zeros(T, n_sim, h, r), zeros(T, n_sim, h, N)
     for sim in 1:n_sim
-        F_last_sim = copy(F_last)
-        for horizon in 1:h
-            F_h = sum(m.A[lag] * (horizon-lag >= 1 ? F_sims[sim, horizon-lag, :] : F_last_sim[lag-horizon+1]) for lag in 1:p)
-            F_sims[sim, horizon, :] = F_h + L_eta * randn(T, r)
-            X_sims[sim, horizon, :] = m.loadings * F_sims[sim, horizon, :] + L_e * randn(T, N)
+        for step in 1:h
+            F_h = sum(m.A[lag] * (step - lag >= 1 ? F_sims[sim, step - lag, :] : F_last[lag - step + 1]) for lag in 1:p)
+            F_sims[sim, step, :] = F_h + L_eta * randn(T, r)
+            X_sims[sim, step, :] = m.loadings * F_sims[sim, step, :] + L_e * randn(T, N)
         end
     end
 
     if m.standardized
         μ, σ = vec(mean(m.X, dims=1)), max.(vec(std(m.X, dims=1)), T(1e-10))
+        X_fc .= X_fc .* σ' .+ μ'
         for sim in 1:n_sim
             X_sims[sim, :, :] = X_sims[sim, :, :] .* σ' .+ μ'
         end
     end
 
-    α_lo, α_hi = (1 - ci_level) / 2, 1 - (1 - ci_level) / 2
-    F_lo = [quantile(F_sims[:, hh, j], α_lo) for hh in 1:h, j in 1:r]
-    F_hi = [quantile(F_sims[:, hh, j], α_hi) for hh in 1:h, j in 1:r]
-    X_lo = [quantile(X_sims[:, hh, j], α_lo) for hh in 1:h, j in 1:N]
-    X_hi = [quantile(X_sims[:, hh, j], α_hi) for hh in 1:h, j in 1:N]
+    α_lo = (1 - conf_level) / 2
+    α_hi = 1 - α_lo
+    F_lo = T[quantile(F_sims[:, hh, j], α_lo) for hh in 1:h, j in 1:r]
+    F_hi = T[quantile(F_sims[:, hh, j], α_hi) for hh in 1:h, j in 1:r]
+    X_lo = T[quantile(X_sims[:, hh, j], α_lo) for hh in 1:h, j in 1:N]
+    X_hi = T[quantile(X_sims[:, hh, j], α_hi) for hh in 1:h, j in 1:N]
+    F_se = T[std(F_sims[:, hh, j]) for hh in 1:h, j in 1:r]
+    X_se = T[std(X_sims[:, hh, j]) for hh in 1:h, j in 1:N]
 
-    (factors=F_fc, observables=X_fc, factors_lower=F_lo, factors_upper=F_hi,
-     observables_lower=X_lo, observables_upper=X_hi)
+    _build_factor_forecast(F_fc, X_fc, F_lo, F_hi, X_lo, X_hi, F_se, X_se, h, conf_T, :simulation)
 end
 
 # =============================================================================

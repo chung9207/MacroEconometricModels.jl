@@ -132,3 +132,135 @@ function _compute_unconditional_covariance(T_mat::AbstractMatrix{T}, Q::Abstract
     end
     Symmetric(P)
 end
+
+# =============================================================================
+# Factor Forecast Helpers (shared across Static FM, DFM, GDFM)
+# =============================================================================
+
+"""
+    _factor_forecast_var_theoretical(A, Sigma_eta, r, p, h) -> Vector{Matrix{T}}
+
+Compute h-step forecast error covariance for factor VAR(p) via VMA(∞) representation.
+
+Returns vector of h covariance matrices (r × r each): MSE_h = Σ_{j=0}^{h-1} Ψ_j Σ_η Ψ_j'.
+"""
+function _factor_forecast_var_theoretical(A::Vector{<:AbstractMatrix{T}}, Sigma_eta::AbstractMatrix{T},
+    r::Int, p::Int, h::Int) where {T<:AbstractFloat}
+
+    state_dim = r * p
+    # Build companion matrix
+    C = zeros(T, state_dim, state_dim)
+    for lag in 1:p
+        C[1:r, ((lag-1)*r+1):(lag*r)] = A[lag]
+    end
+    p > 1 && (C[(r+1):end, 1:(r*(p-1))] = I(r * (p - 1)))
+
+    # Build state-level Q
+    Q = zeros(T, state_dim, state_dim)
+    Q[1:r, 1:r] = Sigma_eta
+
+    # Selector: first r rows of companion state
+    J = zeros(T, r, state_dim)
+    J[1:r, 1:r] = I(r)
+
+    # Accumulate MSE via VMA representation
+    mse = Vector{Matrix{T}}(undef, h)
+    C_power = Matrix{T}(I, state_dim, state_dim)
+    cumul = zeros(T, r, r)
+    for step in 1:h
+        Psi = J * C_power
+        cumul += Psi * Q * Psi'
+        mse[step] = copy(cumul)
+        C_power = C_power * C
+    end
+    mse
+end
+
+"""
+    _factor_forecast_obs_se(factor_mse, Lambda, Sigma_e, h) -> Matrix{T}
+
+Compute observable forecast standard errors.
+
+Var(X_{T+h} error) = Λ * MSE_factor_h * Λ' + Σ_e. Returns h × N matrix of SEs.
+"""
+function _factor_forecast_obs_se(factor_mse::Vector{Matrix{T}}, Lambda::AbstractMatrix{T},
+    Sigma_e::AbstractMatrix{T}, h::Int) where {T<:AbstractFloat}
+
+    N = size(Lambda, 1)
+    obs_se = Matrix{T}(undef, h, N)
+    for step in 1:h
+        obs_var = Lambda * factor_mse[step] * Lambda' + Sigma_e
+        obs_se[step, :] = sqrt.(max.(diag(obs_var), zero(T)))
+    end
+    obs_se
+end
+
+"""
+    _factor_forecast_bootstrap(F_last, A, resids, Sigma_e, Lambda, h, r, p, n_boot, conf_level) -> tuple
+
+Residual bootstrap for factor forecast CIs. Resamples factor VAR residuals,
+simulates factor paths, projects to observables, computes percentile CIs.
+
+Returns (f_lo, f_hi, o_lo, o_hi, f_se, o_se).
+"""
+function _factor_forecast_bootstrap(F_last::Vector{Vector{T}}, A::Vector{<:AbstractMatrix{T}},
+    resids::AbstractMatrix{T}, Sigma_e::AbstractMatrix{T}, Lambda::AbstractMatrix{T},
+    h::Int, r::Int, p::Int, n_boot::Int, conf_level::T) where {T<:AbstractFloat}
+
+    N = size(Lambda, 1)
+    T_resid = size(resids, 1)
+    L_e = safe_cholesky(Sigma_e)
+
+    F_boot = zeros(T, n_boot, h, r)
+    X_boot = zeros(T, n_boot, h, N)
+
+    for b in 1:n_boot
+        for step in 1:h
+            # VAR forecast with resampled innovation
+            F_h = sum(A[lag] * (step - lag >= 1 ? F_boot[b, step - lag, :] : F_last[lag - step + 1]) for lag in 1:p)
+            boot_idx = rand(1:T_resid)
+            F_boot[b, step, :] = F_h + resids[boot_idx, :]
+            X_boot[b, step, :] = Lambda * F_boot[b, step, :] + L_e * randn(T, N)
+        end
+    end
+
+    α_lo = (1 - conf_level) / 2
+    α_hi = 1 - α_lo
+    f_lo = T[quantile(F_boot[:, hh, j], α_lo) for hh in 1:h, j in 1:r]
+    f_hi = T[quantile(F_boot[:, hh, j], α_hi) for hh in 1:h, j in 1:r]
+    o_lo = T[quantile(X_boot[:, hh, j], α_lo) for hh in 1:h, j in 1:N]
+    o_hi = T[quantile(X_boot[:, hh, j], α_hi) for hh in 1:h, j in 1:N]
+    f_se = T[std(F_boot[:, hh, j]) for hh in 1:h, j in 1:r]
+    o_se = T[std(X_boot[:, hh, j]) for hh in 1:h, j in 1:N]
+
+    (f_lo, f_hi, o_lo, o_hi, f_se, o_se)
+end
+
+"""
+    _unstandardize_factor_forecast!(X_fc, X_lo, X_hi, X_se, X_original)
+
+In-place unstandardization of observable forecasts using mean/std of original data.
+"""
+function _unstandardize_factor_forecast!(X_fc::Matrix{T}, X_lo::Matrix{T}, X_hi::Matrix{T},
+    X_se::Matrix{T}, X_original::AbstractMatrix{T}) where {T<:AbstractFloat}
+
+    μ = vec(mean(X_original, dims=1))
+    σ = max.(vec(std(X_original, dims=1)), T(1e-10))
+    X_fc .= X_fc .* σ' .+ μ'
+    X_lo .= X_lo .* σ' .+ μ'
+    X_hi .= X_hi .* σ' .+ μ'
+    X_se .= X_se .* σ'
+    nothing
+end
+
+"""
+    _build_factor_forecast(F_fc, X_fc, F_lo, F_hi, X_lo, X_hi, F_se, X_se, h, conf_level, ci_method) -> FactorForecast{T}
+
+Construct a FactorForecast from components.
+"""
+function _build_factor_forecast(F_fc::Matrix{T}, X_fc::Matrix{T},
+    F_lo::Matrix{T}, F_hi::Matrix{T}, X_lo::Matrix{T}, X_hi::Matrix{T},
+    F_se::Matrix{T}, X_se::Matrix{T}, h::Int, conf_level::T, ci_method::Symbol) where {T<:AbstractFloat}
+
+    FactorForecast{T}(F_fc, X_fc, F_lo, F_hi, X_lo, X_hi, F_se, X_se, h, conf_level, ci_method)
+end
