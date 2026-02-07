@@ -74,10 +74,9 @@ function run_test_group(group_name::String, files::Vector{String})
     end
     """
     # Propagate --code-coverage flag to child processes (needed for CI coverage)
+    # Values: 0=none, 1=user, 2=all, 3=tracefile (Julia 1.12+)
     cov_opt = Base.JLOptions().code_coverage
-    cov_flag = cov_opt == 1 ? `--code-coverage=user` :
-               cov_opt == 2 ? `--code-coverage=all`  :
-               ``
+    cov_flag = cov_opt != 0 ? `--code-coverage=user` : ``
     cmd = `julia $cov_flag --project=$(dirname(test_dir)) -e $code`
     proc = run(pipeline(cmd; stdout=stdout, stderr=stderr); wait=false)
     return proc
