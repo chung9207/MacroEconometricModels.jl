@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Julia package (v0.1.3) for macroeconomic time series analysis. Provides VAR, Bayesian VAR, Local Projections, Factor Models, ARIMA, GMM estimation, structural identification, and hypothesis testing. Requires Julia 1.10+.
+Julia package (v0.1.4) for macroeconomic time series analysis. Provides VAR, Bayesian VAR, Local Projections, Factor Models, ARIMA, GMM estimation, structural identification, and hypothesis testing. Requires Julia 1.10+.
 
 - **Author**: Wookyung Chung
 - **License**: MIT
