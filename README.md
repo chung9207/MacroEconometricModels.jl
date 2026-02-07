@@ -6,7 +6,7 @@
 [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18439170.svg)](https://doi.org/10.5281/zenodo.18439170)
 
-A comprehensive Julia package for macroeconomic time series analysis. Provides VAR, Bayesian VAR, Local Projections, Factor Models, ARIMA, GMM estimation, structural identification (including non-Gaussian and heteroskedasticity-based methods), and hypothesis testing.
+A comprehensive Julia package for macroeconomic time series analysis. Provides VAR, Bayesian VAR, Local Projections, Factor Models, ARIMA, GMM, ARCH/GARCH/Stochastic Volatility estimation, structural identification (including non-Gaussian and heteroskedasticity-based methods), hypothesis testing, and publication-quality output with multi-format bibliographic references.
 
 ## Features
 
@@ -40,10 +40,10 @@ A comprehensive Julia package for macroeconomic time series analysis. Provides V
 - Long-run restrictions (Blanchard & Quah 1989)
 - Arias, Rubio-Ramirez & Waggoner (2018) algorithm for zero and sign restrictions
 
-### Non-Gaussian SVAR Identification
+### Non-Gaussian Structural Identification
+- **Heteroskedasticity-based** - Markov-switching, GARCH, smooth-transition, external volatility
 - **ICA-based methods** - FastICA, JADE, SOBI, distance covariance, HSIC
 - **Non-Gaussian ML** - Student-t, mixture-normal, pseudo-ML, skew-normal
-- **Heteroskedasticity-based** - Markov-switching, GARCH, smooth-transition, external volatility
 - **Multivariate normality tests** - Jarque-Bera, Mardia, Doornik-Hansen, Henze-Zirkler
 - **Identifiability diagnostics** - Shock gaussianity, LR tests, independence tests, bootstrap strength tests
 - Seamless integration: `irf(model, 20; method=:fastica)` works out of the box
@@ -53,7 +53,16 @@ A comprehensive Julia package for macroeconomic time series analysis. Provides V
 - **Forecast Error Variance Decomposition (FEVD)** - Frequentist and Bayesian
 - **LP-FEVD** - R², LP-A, LP-B estimators with bootstrap CIs (Gorodnichenko & Lee 2019)
 - **Historical Decomposition (HD)** - Decompose observed movements into structural shock contributions
-- **Summary Tables** - Publication-quality output with `summary()`, `table()`, `print_table()`
+- **Summary Tables** - Publication-quality output with `report()`, `table()`, `print_table()`
+- **Display Backends** - Switch between text, LaTeX, and HTML table output with `set_display_backend()`
+- **Bibliographic References** - `refs(model)` outputs AEA-style citations in text, LaTeX, BibTeX, or HTML
+
+### Volatility Models
+- **ARCH** - Engle (1982) ARCH(q) with MLE, ARCH-LM test, Ljung-Box squared residuals
+- **GARCH** - GARCH(p,q), EGARCH (Nelson 1991), GJR-GARCH (Glosten, Jagannathan & Runkle 1993)
+- **Stochastic Volatility** - Bayesian SV via MCMC (basic, leverage, Student-t variants)
+- **Forecasting** - Multi-step volatility forecasts with simulation CIs
+- **Diagnostics** - News impact curves, persistence, half-life, unconditional variance
 
 ### Hypothesis Tests
 - **Unit Root Tests** - ADF, KPSS, Phillips-Perron, Zivot-Andrews, Ng-Perron
@@ -184,6 +193,41 @@ dfm = estimate_dynamic_factors(X, 3, 2)
 fc = forecast(dfm, 12; ci_method=:bootstrap, n_boot=500)
 ```
 
+### Volatility Models
+
+```julia
+using MacroEconometricModels
+
+y = randn(500)
+
+# GARCH(1,1)
+gm = estimate_garch(y, 1, 1)
+fc = forecast(gm, 10)
+
+# EGARCH (asymmetric leverage effects)
+em = estimate_egarch(y, 1, 1)
+
+# GJR-GARCH (threshold effects)
+gjr = estimate_gjr_garch(y, 1, 1)
+
+# Stochastic Volatility (Bayesian MCMC)
+sv = estimate_sv(y; variant=:basic, n_samples=1000)
+```
+
+### Bibliographic References
+
+```julia
+using MacroEconometricModels
+
+model = estimate_var(randn(100, 3), 2)
+
+# Get references for any model or method
+refs(model)                     # AEA plain text
+refs(model; format=:bibtex)     # BibTeX entries
+refs(:fastica; format=:latex)   # LaTeX \bibitem
+refs(:johansen; format=:html)   # HTML with DOI links
+```
+
 ## Documentation
 
 Full documentation available at [https://chung9207.github.io/MacroEconometricModels.jl/dev/](https://chung9207.github.io/MacroEconometricModels.jl/dev/)
@@ -220,7 +264,7 @@ Full documentation available at [https://chung9207.github.io/MacroEconometricMod
 - Forni, Mario, Marc Hallin, Marco Lippi, and Lucrezia Reichlin. 2000. "The Generalized Dynamic-Factor Model: Identification and Estimation." *Review of Economics and Statistics* 82 (4): 540–554. [https://doi.org/10.1162/003465300559037](https://doi.org/10.1162/003465300559037)
 - Stock, James H., and Mark W. Watson. 2002. "Forecasting Using Principal Components from a Large Number of Predictors." *Journal of the American Statistical Association* 97 (460): 1167–1179. [https://doi.org/10.1198/016214502388618960](https://doi.org/10.1198/016214502388618960)
 
-### Non-Gaussian SVAR
+### Non-Gaussian Structural Identification
 
 - Hyvärinen, Aapo. 1999. "Fast and Robust Fixed-Point Algorithms for Independent Component Analysis." *IEEE Transactions on Neural Networks* 10 (3): 626–634. [https://doi.org/10.1109/72.761722](https://doi.org/10.1109/72.761722)
 - Lanne, Markku, Mika Meitz, and Pentti Saikkonen. 2017. "Identification and Estimation of Non-Gaussian Structural Vector Autoregressions." *Journal of Econometrics* 196 (2): 288–304. [https://doi.org/10.1016/j.jeconom.2016.06.002](https://doi.org/10.1016/j.jeconom.2016.06.002)
@@ -233,6 +277,19 @@ Full documentation available at [https://chung9207.github.io/MacroEconometricMod
 - Johansen, Søren. 1991. "Estimation and Hypothesis Testing of Cointegration Vectors in Gaussian Vector Autoregressive Models." *Econometrica* 59 (6): 1551–1580. [https://doi.org/10.2307/2938278](https://doi.org/10.2307/2938278)
 - Kwiatkowski, Denis, Peter C. B. Phillips, Peter Schmidt, and Yongcheol Shin. 1992. "Testing the Null Hypothesis of Stationarity Against the Alternative of a Unit Root." *Journal of Econometrics* 54 (1–3): 159–178. [https://doi.org/10.1016/0304-4076(92)90104-Y](https://doi.org/10.1016/0304-4076(92)90104-Y)
 - Ng, Serena, and Pierre Perron. 2001. "Lag Length Selection and the Construction of Unit Root Tests with Good Size and Power." *Econometrica* 69 (6): 1519–1554. [https://doi.org/10.1111/1468-0262.00256](https://doi.org/10.1111/1468-0262.00256)
+
+### ARIMA
+
+- Box, George E. P., and Gwilym M. Jenkins. 1970. *Time Series Analysis: Forecasting and Control*. San Francisco: Holden-Day. ISBN 978-0-8162-1094-7.
+- Hyndman, Rob J., and Yeasmin Khandakar. 2008. "Automatic Time Series Forecasting: The forecast Package for R." *Journal of Statistical Software* 27 (3): 1–22. [https://doi.org/10.18637/jss.v027.i03](https://doi.org/10.18637/jss.v027.i03)
+
+### Volatility Models
+
+- Bollerslev, Tim. 1986. "Generalized Autoregressive Conditional Heteroskedasticity." *Journal of Econometrics* 31 (3): 307–327. [https://doi.org/10.1016/0304-4076(86)90063-1](https://doi.org/10.1016/0304-4076(86)90063-1)
+- Engle, Robert F. 1982. "Autoregressive Conditional Heteroscedasticity with Estimates of the Variance of United Kingdom Inflation." *Econometrica* 50 (4): 987–1007. [https://doi.org/10.2307/1912773](https://doi.org/10.2307/1912773)
+- Glosten, Lawrence R., Ravi Jagannathan, and David E. Runkle. 1993. "On the Relation Between the Expected Value and the Volatility of the Nominal Excess Return on Stocks." *Journal of Finance* 48 (5): 1779–1801. [https://doi.org/10.1111/j.1540-6261.1993.tb05128.x](https://doi.org/10.1111/j.1540-6261.1993.tb05128.x)
+- Nelson, Daniel B. 1991. "Conditional Heteroskedasticity in Asset Returns: A New Approach." *Econometrica* 59 (2): 347–370. [https://doi.org/10.2307/2938260](https://doi.org/10.2307/2938260)
+- Taylor, Stephen J. 1986. *Modelling Financial Time Series*. Chichester: Wiley. ISBN 978-0-471-90993-4.
 
 ### GMM and Covariance Estimation
 
