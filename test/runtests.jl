@@ -14,6 +14,7 @@ const TEST_GROUPS = [
         "bvar/test_bayesian_utils.jl",
         "bvar/test_minnesota.jl",
         "bvar/test_bgr.jl",
+        "core/test_coverage_gaps.jl",
     ]),
     # Group 2: IRF, FEVD, HD, StatsAPI
     ("IRF & FEVD" => [
@@ -42,6 +43,7 @@ const TEST_GROUPS = [
     ("ARIMA & Utilities" => [
         "teststat/test_unitroot.jl",
         "arima/test_arima.jl",
+        "arima/test_arima_coverage.jl",
         "core/test_utils.jl",
         "core/test_edge_cases.jl",
         "core/test_examples.jl",
@@ -61,6 +63,7 @@ const TEST_GROUPS = [
     # Group 7: Volatility models (ARCH/GARCH/SV — MCMC heavy)
     ("Volatility Models" => [
         "volatility/test_volatility.jl",
+        "volatility/test_volatility_coverage.jl",
     ]),
 ]
 
@@ -129,6 +132,10 @@ else
             include("bvar/test_bayesian.jl")
             include("bvar/test_samplers.jl")
             include("bvar/test_bayesian_utils.jl")
+        end
+
+        @testset "Coverage Gaps" begin
+            include("core/test_coverage_gaps.jl")
         end
 
         @testset "Impulse Response Functions" begin
@@ -200,6 +207,10 @@ else
             include("arima/test_arima.jl")
         end
 
+        @testset "ARIMA Coverage" begin
+            include("arima/test_arima_coverage.jl")
+        end
+
         @testset "Utility Functions" begin
             include("core/test_utils.jl")
         end
@@ -246,6 +257,10 @@ else
 
         @testset "Volatility Models (ARCH/GARCH/SV)" begin
             include("volatility/test_volatility.jl")
+        end
+
+        @testset "Volatility Coverage" begin
+            include("volatility/test_volatility_coverage.jl")
         end
     end
 end
