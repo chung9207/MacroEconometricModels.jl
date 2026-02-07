@@ -15,7 +15,7 @@ A comprehensive Julia package for macroeconomic time series analysis. Provides V
 - **Automatic order selection** - `auto_arima` with grid search over (p,d,q), AIC/BIC information criteria
 - **Forecasting** - Multi-step ahead with confidence intervals via psi-weight accumulation
 - **Time Series Filters** - Trend-cycle decomposition:
-  - Hodrick-Prescott filter (sparse pentadiagonal Cholesky)
+  - Hodrick-Prescott filter
   - Hamilton (2018) regression filter
   - Beveridge-Nelson decomposition (ARIMA psi-weights)
   - Baxter-King band-pass filter
