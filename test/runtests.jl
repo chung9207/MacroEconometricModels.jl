@@ -7,60 +7,60 @@ using Test
 const TEST_GROUPS = [
     # Group 1: Core VAR + Bayesian (heavy MCMC)
     ("Core & Bayesian" => [
-        "test_aqua.jl",
-        "test_core_var.jl",
-        "test_bayesian.jl",
-        "test_samplers.jl",
-        "test_bayesian_utils.jl",
-        "test_minnesota.jl",
-        "test_bgr.jl",
+        "core/test_aqua.jl",
+        "var/test_core_var.jl",
+        "bvar/test_bayesian.jl",
+        "bvar/test_samplers.jl",
+        "bvar/test_bayesian_utils.jl",
+        "bvar/test_minnesota.jl",
+        "bvar/test_bgr.jl",
     ]),
     # Group 2: IRF, FEVD, HD, StatsAPI
     ("IRF & FEVD" => [
-        "test_irf.jl",
-        "test_irf_ci.jl",
-        "test_statsapi.jl",
-        "test_fevd.jl",
-        "test_hd.jl",
-        "test_summary.jl",
+        "var/test_irf.jl",
+        "var/test_irf_ci.jl",
+        "var/test_statsapi.jl",
+        "var/test_fevd.jl",
+        "var/test_hd.jl",
+        "core/test_summary.jl",
     ]),
     # Group 3: Factor models
     ("Factor Models" => [
-        "test_factormodel.jl",
-        "test_dynamicfactormodel.jl",
-        "test_gdfm.jl",
-        "test_factor_forecast.jl",
+        "factor/test_factormodel.jl",
+        "factor/test_dynamicfactormodel.jl",
+        "factor/test_gdfm.jl",
+        "factor/test_factor_forecast.jl",
     ]),
     # Group 4: Local Projections
     ("Local Projections" => [
-        "test_lp.jl",
-        "test_lp_structural.jl",
-        "test_lp_forecast.jl",
-        "test_lp_fevd.jl",
+        "lp/test_lp.jl",
+        "lp/test_lp_structural.jl",
+        "lp/test_lp_forecast.jl",
+        "lp/test_lp_fevd.jl",
     ]),
     # Group 5: ARIMA + Unit Root + GMM + Utilities
     ("ARIMA & Utilities" => [
-        "test_unitroot.jl",
-        "test_arima.jl",
-        "test_utils.jl",
-        "test_edge_cases.jl",
-        "test_examples.jl",
-        "test_gmm.jl",
-        "test_covariance.jl",
+        "teststat/test_unitroot.jl",
+        "arima/test_arima.jl",
+        "core/test_utils.jl",
+        "core/test_edge_cases.jl",
+        "core/test_examples.jl",
+        "gmm/test_gmm.jl",
+        "core/test_covariance.jl",
     ]),
     # Group 6: Non-Gaussian + Display + Misc
     ("Non-Gaussian & Display" => [
-        "test_normality.jl",
-        "test_nongaussian_svar.jl",
-        "test_display_backends.jl",
-        "test_nongaussian_internals.jl",
-        "test_error_paths.jl",
-        "test_internal_helpers.jl",
-        "test_arias2018.jl",
+        "teststat/test_normality.jl",
+        "nongaussian/test_nongaussian_svar.jl",
+        "core/test_display_backends.jl",
+        "nongaussian/test_nongaussian_internals.jl",
+        "core/test_error_paths.jl",
+        "core/test_internal_helpers.jl",
+        "var/test_arias2018.jl",
     ]),
     # Group 7: Volatility models (ARCH/GARCH/SV — MCMC heavy)
     ("Volatility Models" => [
-        "test_volatility.jl",
+        "volatility/test_volatility.jl",
     ]),
 ]
 
@@ -114,138 +114,138 @@ else
     # Sequential fallback (original behavior)
     @testset "MacroEconometricModels Package Tests" begin
         @testset "Aqua" begin
-            include("test_aqua.jl")
+            include("core/test_aqua.jl")
         end
 
         @testset "Core VAR" begin
-            include("test_core_var.jl")
+            include("var/test_core_var.jl")
         end
 
         @testset "Unit Root Tests" begin
-            include("test_unitroot.jl")
+            include("teststat/test_unitroot.jl")
         end
 
         @testset "Bayesian Estimation" begin
-            include("test_bayesian.jl")
-            include("test_samplers.jl")
-            include("test_bayesian_utils.jl")
+            include("bvar/test_bayesian.jl")
+            include("bvar/test_samplers.jl")
+            include("bvar/test_bayesian_utils.jl")
         end
 
         @testset "Impulse Response Functions" begin
-            include("test_irf.jl")
-            include("test_irf_ci.jl")
+            include("var/test_irf.jl")
+            include("var/test_irf_ci.jl")
         end
 
         @testset "Minnesota Prior" begin
-            include("test_minnesota.jl")
+            include("bvar/test_minnesota.jl")
         end
 
         @testset "BGR Optimization" begin
-            include("test_bgr.jl")
+            include("bvar/test_bgr.jl")
         end
 
         @testset "StatsAPI Compatibility" begin
-            include("test_statsapi.jl")
+            include("var/test_statsapi.jl")
         end
 
         @testset "FEVD" begin
-            include("test_fevd.jl")
+            include("var/test_fevd.jl")
         end
 
         @testset "Historical Decomposition" begin
-            include("test_hd.jl")
+            include("var/test_hd.jl")
         end
 
         @testset "Summary Tables" begin
-            include("test_summary.jl")
+            include("core/test_summary.jl")
         end
 
         @testset "Factor Model" begin
-            include("test_factormodel.jl")
+            include("factor/test_factormodel.jl")
         end
 
         @testset "Dynamic Factor Model" begin
-            include("test_dynamicfactormodel.jl")
+            include("factor/test_dynamicfactormodel.jl")
         end
 
         @testset "Generalized Dynamic Factor Model" begin
-            include("test_gdfm.jl")
+            include("factor/test_gdfm.jl")
         end
 
         @testset "Factor Model Forecasting" begin
-            include("test_factor_forecast.jl")
+            include("factor/test_factor_forecast.jl")
         end
 
         @testset "Arias et al. (2018) SVAR Identification" begin
-            include("test_arias2018.jl")
+            include("var/test_arias2018.jl")
         end
 
         @testset "Local Projections" begin
-            include("test_lp.jl")
+            include("lp/test_lp.jl")
         end
 
         @testset "Structural LP" begin
-            include("test_lp_structural.jl")
+            include("lp/test_lp_structural.jl")
         end
 
         @testset "LP Forecasting" begin
-            include("test_lp_forecast.jl")
+            include("lp/test_lp_forecast.jl")
         end
 
         @testset "LP-FEVD (Gorodnichenko & Lee 2019)" begin
-            include("test_lp_fevd.jl")
+            include("lp/test_lp_fevd.jl")
         end
 
         @testset "ARIMA Models" begin
-            include("test_arima.jl")
+            include("arima/test_arima.jl")
         end
 
         @testset "Utility Functions" begin
-            include("test_utils.jl")
+            include("core/test_utils.jl")
         end
 
         @testset "Edge Cases" begin
-            include("test_edge_cases.jl")
+            include("core/test_edge_cases.jl")
         end
 
         @testset "Documentation Examples" begin
-            include("test_examples.jl")
+            include("core/test_examples.jl")
         end
 
         @testset "GMM Estimation" begin
-            include("test_gmm.jl")
+            include("gmm/test_gmm.jl")
         end
 
         @testset "Covariance Estimators" begin
-            include("test_covariance.jl")
+            include("core/test_covariance.jl")
         end
 
         @testset "Multivariate Normality Tests" begin
-            include("test_normality.jl")
+            include("teststat/test_normality.jl")
         end
 
         @testset "Non-Gaussian SVAR Identification" begin
-            include("test_nongaussian_svar.jl")
+            include("nongaussian/test_nongaussian_svar.jl")
         end
 
         @testset "Display Backend Switching" begin
-            include("test_display_backends.jl")
+            include("core/test_display_backends.jl")
         end
 
         @testset "Non-Gaussian Internals" begin
-            include("test_nongaussian_internals.jl")
+            include("nongaussian/test_nongaussian_internals.jl")
         end
 
         @testset "Error Paths" begin
-            include("test_error_paths.jl")
+            include("core/test_error_paths.jl")
         end
 
         @testset "Internal Helpers" begin
-            include("test_internal_helpers.jl")
+            include("core/test_internal_helpers.jl")
         end
 
         @testset "Volatility Models (ARCH/GARCH/SV)" begin
-            include("test_volatility.jl")
+            include("volatility/test_volatility.jl")
         end
     end
 end
