@@ -1,4 +1,4 @@
-# Non-Gaussian SVAR Identification
+# Non-Gaussian Structural Identification
 
 This page covers identification of structural VAR models using non-Gaussian distributional assumptions, heteroskedasticity, and ICA methods. These methods provide identification without requiring the recursive ordering of Cholesky or the a priori sign/zero restrictions of traditional SVAR.
 

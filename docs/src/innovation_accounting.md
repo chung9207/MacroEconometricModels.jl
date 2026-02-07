@@ -393,6 +393,71 @@ df = table(hd_result, "Output")
 
 ---
 
+## Display Backends
+
+All `show`, `print_table`, and `report` methods route through a unified PrettyTables backend. Switching from terminal text to LaTeX or HTML output requires a single call:
+
+```julia
+# Switch output format globally
+set_display_backend(:text)    # Terminal-friendly (default)
+set_display_backend(:latex)   # LaTeX \begin{tabular} output
+set_display_backend(:html)    # HTML <table> output
+
+# Check current backend
+get_display_backend()         # :text
+```
+
+This applies to all innovation accounting results — IRF, FEVD, and HD tables:
+
+```julia
+# IRF table in LaTeX for a paper
+set_display_backend(:latex)
+open("tables/irf_table.tex", "w") do io
+    print_table(io, irfs, 1, 1; horizons=[1, 4, 8, 12, 20])
+end
+
+# FEVD table in HTML for slides
+set_display_backend(:html)
+open("slides/fevd.html", "w") do io
+    print_table(io, fevd_result, 1; horizons=[1, 4, 8, 12, 20])
+end
+
+# Reset to text for interactive work
+set_display_backend(:text)
+```
+
+For a comprehensive display backend workflow, see [Example 12: Table Output](examples.md#Example-12:-Table-Output-Text,-LaTeX,-and-HTML).
+
+---
+
+## Bibliographic References
+
+The `refs()` function returns bibliographic references for any model or identification method. This integrates with innovation accounting results:
+
+```julia
+# References for a VAR model
+refs(model)                           # AEA text format (default)
+refs(model; format=:bibtex)           # BibTeX format
+refs(model; format=:latex)            # LaTeX \bibitem format
+
+# References by identification method
+refs(:cholesky)                       # Cholesky decomposition references
+refs(:fastica)                        # FastICA references
+refs(:sign)                           # Sign restriction references
+
+# Write BibTeX to file
+open("references.bib", "w") do io
+    refs(io, model; format=:bibtex)
+end
+```
+
+For a comprehensive references workflow, see [Example 13: Bibliographic References](examples.md#Example-13:-Bibliographic-References).
+
+!!! note "Technical Note"
+    For non-Gaussian identification methods (ICA, ML, heteroskedasticity-based), see [Non-Gaussian Structural Identification](nongaussian.md). All 18 identification methods work seamlessly with `irf()`, `fevd()`, and `historical_decomposition()` via the `method` keyword.
+
+---
+
 ## Complete Example
 
 This example combines IRF, FEVD, and HD for a three-variable VAR.

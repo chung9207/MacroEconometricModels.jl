@@ -215,7 +215,66 @@ Order   = [:function]
 
 ---
 
-## Non-Gaussian SVAR Identification
+## Volatility Models
+
+### ARCH Estimation and Diagnostics
+
+```@docs
+estimate_arch
+arch_lm_test
+ljung_box_squared
+```
+
+### GARCH Estimation and Diagnostics
+
+```@docs
+estimate_garch
+estimate_egarch
+estimate_gjr_garch
+news_impact_curve
+```
+
+### Stochastic Volatility
+
+```@docs
+estimate_sv
+```
+
+### Volatility Forecasting
+
+```@autodocs
+Modules = [MacroEconometricModels]
+Pages   = ["arch/forecast.jl", "garch/forecast.jl", "sv/forecast.jl"]
+Order   = [:function]
+```
+
+### Volatility Accessors
+
+```@docs
+persistence
+halflife
+unconditional_variance
+arch_order
+garch_order
+```
+
+---
+
+## Display and References
+
+```@autodocs
+Modules = [MacroEconometricModels]
+Pages   = ["core/display.jl"]
+Order   = [:function]
+```
+
+```@docs
+refs
+```
+
+---
+
+## Non-Gaussian Structural Identification
 
 ### Normality Tests
 

@@ -73,7 +73,12 @@ function run_test_group(group_name::String, files::Vector{String})
         $includes
     end
     """
-    cmd = `julia --project=$(dirname(test_dir)) -e $code`
+    # Propagate --code-coverage flag to child processes (needed for CI coverage)
+    cov_opt = Base.JLOptions().code_coverage
+    cov_flag = cov_opt == 1 ? `--code-coverage=user` :
+               cov_opt == 2 ? `--code-coverage=all`  :
+               ``
+    cmd = `julia $cov_flag --project=$(dirname(test_dir)) -e $code`
     proc = run(pipeline(cmd; stdout=stdout, stderr=stderr); wait=false)
     return proc
 end
@@ -92,18 +97,18 @@ if parallel && Sys.CPU_THREADS >= 2
     end
 
     # Wait for all and collect results
-    all_passed = true
+    failed_groups = String[]
     for (name, proc) in procs
         wait(proc)
         if proc.exitcode != 0
             @error "Test group '$name' FAILED (exit code $(proc.exitcode))"
-            all_passed = false
+            push!(failed_groups, name)
         else
             @info "Test group '$name' PASSED"
         end
     end
 
-    all_passed || error("Some test groups failed")
+    isempty(failed_groups) || error("Test groups failed: $(join(failed_groups, ", "))")
 else
     # Sequential fallback (original behavior)
     @testset "MacroEconometricModels Package Tests" begin

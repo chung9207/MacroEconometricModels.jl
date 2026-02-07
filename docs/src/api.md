@@ -151,6 +151,37 @@ The API documentation is organized into the following pages:
 | `test_identification_strength(model; ...)` | Bootstrap identification strength test |
 | `test_overidentification(model, result; ...)` | Overidentification test |
 
+### Volatility Model Functions
+
+| Function | Description |
+|----------|-------------|
+| `estimate_arch(y, q)` | ARCH(q) via MLE |
+| `estimate_garch(y, p, q)` | GARCH(p,q) via MLE |
+| `estimate_egarch(y, p, q)` | EGARCH(p,q) via MLE |
+| `estimate_gjr_garch(y, p, q)` | GJR-GARCH(p,q) via MLE |
+| `estimate_sv(y; variant, ...)` | Stochastic Volatility via MCMC |
+| `forecast(vol_model, h)` | Volatility forecast with simulation CIs |
+| `arch_lm_test(y_or_model, q)` | ARCH-LM test for conditional heteroskedasticity |
+| `ljung_box_squared(z_or_model, K)` | Ljung-Box test on squared residuals |
+| `news_impact_curve(model)` | News impact curve (GARCH family) |
+| `persistence(model)` | Persistence measure |
+| `halflife(model)` | Volatility half-life |
+| `unconditional_variance(model)` | Unconditional variance |
+| `arch_order(model)` | ARCH order ``q`` |
+| `garch_order(model)` | GARCH order ``p`` |
+
+### Display and Output Functions
+
+| Function | Description |
+|----------|-------------|
+| `set_display_backend(sym)` | Switch output format (`:text`/`:latex`/`:html`) |
+| `get_display_backend()` | Current display backend |
+| `report(result)` | Print comprehensive summary |
+| `table(result, ...)` | Extract results as matrix |
+| `print_table([io], result, ...)` | Print formatted table |
+| `refs(model; format=...)` | Bibliographic references |
+| `refs(io, :method; format=...)` | References by method name |
+
 ### Covariance Functions
 
 | Function | Description |

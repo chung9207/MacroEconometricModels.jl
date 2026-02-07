@@ -97,6 +97,17 @@ AbstractPrior
 
 ---
 
+## Covariance Estimators
+
+```@docs
+AbstractCovarianceEstimator
+NeweyWestEstimator
+WhiteEstimator
+DriscollKraayEstimator
+```
+
+---
+
 ## Unit Root Test Types
 
 ```@docs
@@ -119,6 +130,20 @@ ZeroRestriction
 SignRestriction
 SVARRestrictions
 AriasSVARResult
+```
+
+---
+
+## Volatility Models
+
+```@docs
+AbstractVolatilityModel
+ARCHModel
+GARCHModel
+EGARCHModel
+GJRGARCHModel
+SVModel
+VolatilityForecast
 ```
 
 ---
@@ -220,4 +245,13 @@ AbstractNonGaussianSVAR
 └── ExternalVolatilitySVARResult{T}
 
 IdentifiabilityTestResult{T}
+
+AbstractVolatilityModel <: StatsAPI.RegressionModel
+├── ARCHModel{T}
+├── GARCHModel{T}
+├── EGARCHModel{T}
+├── GJRGARCHModel{T}
+└── SVModel{T}
+
+VolatilityForecast{T}
 ```

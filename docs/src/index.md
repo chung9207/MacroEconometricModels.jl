@@ -9,15 +9,18 @@
 ### Key Features
 
 - **ARIMA Models**: AR, MA, ARMA, and ARIMA estimation via OLS, CSS, MLE (Kalman filter), and CSS-MLE; automatic order selection; multi-step forecasting with confidence intervals
+- **Volatility Models**: ARCH (Engle 1982), GARCH (Bollerslev 1986), EGARCH (Nelson 1991), GJR-GARCH (Glosten et al. 1993) via MLE with two-stage optimization; Stochastic Volatility (Taylor 1986) via Bayesian MCMC; news impact curves, ARCH-LM and Ljung-Box diagnostics, multi-step volatility forecasting with simulation-based CIs
 - **Vector Autoregression (VAR)**: OLS estimation with comprehensive diagnostics, impulse response functions (IRFs), and forecast error variance decomposition (FEVD)
 - **Structural Identification**: Multiple identification schemes including Cholesky, sign restrictions, long-run (Blanchard-Quah), and narrative restrictions
 - **Bayesian VAR**: Minnesota/Litterman prior with automatic hyperparameter optimization via marginal likelihood (Giannone, Lenza & Primiceri, 2015)
 - **Local Projections**: Jordà (2005) methodology with extensions for IV (Stock & Watson, 2018), smooth LP (Barnichon & Brownlees, 2019), state-dependence (Auerbach & Gorodnichenko, 2013), propensity score methods (Angrist, Jordà & Kuersteiner, 2018), structural LP (Plagborg-Møller & Wolf, 2021), LP forecasting, and LP-FEVD (Gorodnichenko & Lee, 2019)
 - **Factor Models**: Static, dynamic, and generalized dynamic factor models with Bai & Ng (2002) information criteria; unified forecasting with theoretical (analytical) and bootstrap confidence intervals
-- **Non-Gaussian SVAR**: ICA-based identification (FastICA, JADE, SOBI, dCov, HSIC), non-Gaussian ML (Student-t, mixture-normal, PML, skew-normal), heteroskedasticity-based identification (Markov-switching, GARCH, smooth-transition), multivariate normality tests, identifiability diagnostics
+- **Non-Gaussian Structural Identification**: ICA-based identification (FastICA, JADE, SOBI, dCov, HSIC), non-Gaussian ML (Student-t, mixture-normal, PML, skew-normal), heteroskedasticity-based identification (Markov-switching, GARCH, smooth-transition), multivariate normality tests, identifiability diagnostics
 - **Hypothesis Tests**: Comprehensive unit root tests (ADF, KPSS, Phillips-Perron, Zivot-Andrews, Ng-Perron) and Johansen cointegration test
 - **GMM Estimation**: Flexible GMM framework with one-step, two-step, and iterated estimation
 - **Robust Inference**: Newey-West, White, and Driscoll-Kraay HAC standard errors with automatic bandwidth selection
+- **Display Backends**: Unified PrettyTables output with switchable backends (`:text`, `:latex`, `:html`) for terminal, papers, and web
+- **Bibliographic References**: `refs()` function for multi-format (AEA text, BibTeX, LaTeX, HTML) bibliographic references for all models and methods
 
 ## Installation
 
@@ -42,8 +45,11 @@ chain = estimate_bvar(Y, 2; prior=:minnesota)       # Bayesian VAR
 lp = estimate_lp(Y, 1, 20; cov_type=:newey_west)   # Local Projections
 fm = estimate_factors(X, 3)                         # Factor model
 ar = estimate_ar(y, 2)                              # AR(2)
+garch = estimate_garch(y, 1, 1)                     # GARCH(1,1)
+sv = estimate_sv(y; n_samples=2000)                 # Stochastic Volatility
 adf = adf_test(y)                                   # Unit root test
 gmm = estimate_gmm(g, θ₀, data; weighting=:two_step)  # GMM
+refs(model)                                         # Bibliographic references
 ```
 
 ### Expanded Examples
@@ -185,22 +191,68 @@ fc.ci_lower    # Lower bound
 fc.ci_upper    # Upper bound
 ```
 
+### Volatility Models
+
+```julia
+using MacroEconometricModels
+
+# Financial returns data
+y = randn(500)
+
+# Estimate GARCH(1,1) and EGARCH(1,1)
+garch = estimate_garch(y, 1, 1)
+egarch = estimate_egarch(y, 1, 1)
+
+# Model summary statistics
+persistence(garch)              # Volatility persistence
+halflife(garch)                 # Variance half-life
+unconditional_variance(garch)   # Long-run variance
+
+# News impact curve (asymmetry diagnostic)
+nic = news_impact_curve(egarch)
+
+# Multi-step volatility forecast
+fc = forecast(garch, 20; conf_level=0.95)
+
+# Stochastic Volatility via MCMC
+sv = estimate_sv(y; n_samples=2000, n_adapts=1000)
+```
+
+### Display Backends and References
+
+```julia
+using MacroEconometricModels
+
+# Switch table output format
+set_display_backend(:latex)     # LaTeX tables for papers
+set_display_backend(:html)      # HTML tables for web/Jupyter
+set_display_backend(:text)      # Terminal output (default)
+
+# Bibliographic references for any model or method
+refs(model)                     # AEA text format
+refs(model; format=:bibtex)     # BibTeX for .bib files
+refs(:fastica; format=:latex)   # LaTeX \bibitem format
+```
+
 ## Package Structure
 
 The package is organized into the following modules:
 
 | Module | Description |
 |--------|-------------|
+| `core/` | Shared infrastructure: types, utilities, display backends, covariance estimators |
+| `arima/` | ARIMA suite: types, Kalman filter, estimation (CSS/MLE), forecasting, order selection |
+| `arch/` | ARCH(q) estimation via MLE, ARCH-LM test, Ljung-Box squared, volatility forecasting |
+| `garch/` | GARCH, EGARCH, GJR-GARCH estimation via MLE, news impact curves, forecasting |
+| `sv/` | Stochastic Volatility via Bayesian MCMC (Turing.jl), posterior predictive forecasts |
 | `var/` | VAR estimation (OLS), structural identification, IRF, FEVD, historical decomposition |
 | `bvar/` | Bayesian VAR: MCMC estimation, Minnesota prior, hyperparameter optimization |
-| `summary.jl` | Publication-quality summary tables for all result types |
-| `arima/` | ARIMA suite: types, Kalman filter, estimation (CSS/MLE), forecasting, order selection |
 | `lp/` | Local Projections: core, IV, smooth, state-dependent, propensity, structural LP, forecast, LP-FEVD |
 | `factor/` | Static (PCA), dynamic (two-step/EM), generalized (spectral) factor models with forecasting |
+| `nongaussian/` | Non-Gaussian structural identification: normality tests, ICA, ML, heteroskedastic-ID |
 | `unitroot/` | Unit root tests (ADF, KPSS, PP, ZA, Ng-Perron) and Johansen cointegration |
-| `nongaussian/` | Non-Gaussian SVAR: normality tests, ICA, ML, heteroskedastic identification |
-| `gmm/gmm.jl` | Generalized Method of Moments |
-| `core/` | Shared infrastructure: types, utilities, display, covariance estimators |
+| `gmm/` | Generalized Method of Moments |
+| `summary.jl` | Publication-quality summary tables and `refs()` bibliographic references |
 
 ## Mathematical Notation
 
@@ -226,6 +278,14 @@ Throughout this documentation, we use the following notation conventions:
 - Box, George E. P., and Gwilym M. Jenkins. 1976. *Time Series Analysis: Forecasting and Control*. San Francisco: Holden-Day. ISBN 978-0-816-21104-3.
 - Brockwell, Peter J., and Richard A. Davis. 1991. *Time Series: Theory and Methods*. 2nd ed. New York: Springer. ISBN 978-1-4419-0319-8.
 - Harvey, Andrew C. 1993. *Time Series Models*. 2nd ed. Cambridge, MA: MIT Press. ISBN 978-0-262-08224-2.
+
+### Volatility Models
+
+- Bollerslev, Tim. 1986. "Generalized Autoregressive Conditional Heteroskedasticity." *Journal of Econometrics* 31 (3): 307–327. [https://doi.org/10.1016/0304-4076(86)90063-1](https://doi.org/10.1016/0304-4076(86)90063-1)
+- Engle, Robert F. 1982. "Autoregressive Conditional Heteroscedasticity with Estimates of the Variance of United Kingdom Inflation." *Econometrica* 50 (4): 987–1007. [https://doi.org/10.2307/1912773](https://doi.org/10.2307/1912773)
+- Glosten, Lawrence R., Ravi Jagannathan, and David E. Runkle. 1993. "On the Relation between the Expected Value and the Volatility of the Nominal Excess Return on Stocks." *Journal of Finance* 48 (5): 1779–1801. [https://doi.org/10.1111/j.1540-6261.1993.tb05128.x](https://doi.org/10.1111/j.1540-6261.1993.tb05128.x)
+- Nelson, Daniel B. 1991. "Conditional Heteroskedasticity in Asset Returns: A New Approach." *Econometrica* 59 (2): 347–370. [https://doi.org/10.2307/2938260](https://doi.org/10.2307/2938260)
+- Taylor, Stephen J. 1986. *Modelling Financial Time Series*. Chichester: Wiley. ISBN 978-0-471-90975-7.
 
 ### Core Methodology
 
@@ -274,6 +334,6 @@ Contributions are welcome! Please see the [GitHub repository](https://github.com
 ## Contents
 
 ```@contents
-Pages = ["arima.md", "manual.md", "lp.md", "factormodels.md", "bayesian.md", "innovation_accounting.md", "hypothesis_tests.md", "api.md", "examples.md"]
+Pages = ["arima.md", "volatility.md", "manual.md", "lp.md", "factormodels.md", "bayesian.md", "innovation_accounting.md", "nongaussian.md", "hypothesis_tests.md", "examples.md", "api.md"]
 Depth = 2
 ```

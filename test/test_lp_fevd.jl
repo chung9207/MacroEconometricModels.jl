@@ -182,7 +182,7 @@ using Statistics
         buf = IOBuffer()
         print_table(buf, f, 1)
         output = String(take!(buf))
-        @test occursin("CI_lo", output)
+        @test occursin("Lower", output)
     end
 
     # =========================================================================

@@ -6,21 +6,192 @@ This chapter provides comprehensive worked examples demonstrating the main funct
 
 | # | Example | Key Functions | Description |
 |---|---------|---------------|-------------|
-| 1 | Unit Root Testing | `adf_test`, `kpss_test`, `johansen_test` | ADF, KPSS, Zivot-Andrews, Ng-Perron, Johansen |
-| 2 | Three-Variable VAR | `estimate_var`, `irf`, `fevd` | Frequentist VAR with Cholesky and sign restriction identification |
-| 3 | Non-Gaussian SVAR Identification | `identify_fastica`, `normality_test_suite`, `test_shock_gaussianity` | ICA, ML, heteroskedastic identification |
-| 4 | Bayesian VAR with Minnesota Prior | `estimate_bvar`, `optimize_hyperparameters` | Minnesota prior, MCMC estimation, credible intervals |
-| 5 | Local Projections | `estimate_lp`, `estimate_lp_iv`, `estimate_smooth_lp` | Standard, IV, smooth, and state-dependent LP |
-| 6 | Factor Model for Large Panels | `estimate_factors`, `ic_criteria`, `forecast` | Large panel factor extraction, Bai-Ng criteria, forecasting with CIs |
-| 7 | GMM Estimation | `estimate_gmm`, `j_test` | IV regression via GMM, overidentification test |
-| 8 | Complete Workflow | Multiple | Unit roots → lag selection → VAR → BVAR → LP comparison |
-| 9 | Table Output (LaTeX & HTML) | `set_display_backend`, `print_table`, `table` | Export tables for papers, slides, and web |
+| 1 | ARIMA Models | `estimate_ar`, `estimate_arma`, `auto_arima`, `forecast` | AR, MA, ARMA estimation, order selection, forecasting |
+| 2 | Volatility Models | `estimate_garch`, `estimate_egarch`, `estimate_sv`, `news_impact_curve` | ARCH/GARCH/SV estimation, diagnostics, forecasting |
+| 3 | Three-Variable VAR | `estimate_var`, `irf`, `fevd` | Frequentist VAR with Cholesky and sign restriction identification |
+| 4 | Local Projections | `estimate_lp`, `estimate_lp_iv`, `estimate_smooth_lp` | Standard, IV, smooth, and state-dependent LP |
+| 5 | Factor Model for Large Panels | `estimate_factors`, `ic_criteria`, `forecast` | Large panel factor extraction, Bai-Ng criteria, forecasting with CIs |
+| 6 | Bayesian VAR with Minnesota Prior | `estimate_bvar`, `optimize_hyperparameters` | Minnesota prior, MCMC estimation, credible intervals |
+| 7 | Non-Gaussian Structural Identification | `identify_fastica`, `normality_test_suite`, `test_shock_gaussianity` | ICA, ML, heteroskedastic identification |
+| 8 | Unit Root Testing | `adf_test`, `kpss_test`, `johansen_test` | ADF, KPSS, Zivot-Andrews, Ng-Perron, Johansen |
+| 9 | GMM Estimation | `estimate_gmm`, `j_test` | IV regression via GMM, overidentification test |
+| 10 | Complete Workflow | Multiple | Unit roots → lag selection → VAR → BVAR → LP comparison |
+| 11 | Table Output (LaTeX & HTML) | `set_display_backend`, `print_table`, `table` | Export tables for papers, slides, and web |
+| 12 | Bibliographic References | `refs` | Multi-format references for models and methods |
 
 ---
 
-## Example 1: Unit Root Testing and Pre-Estimation Analysis
+## Example 1: ARIMA Models
 
-This example demonstrates comprehensive unit root testing before fitting VAR models. Pre-estimation analysis is the first step in any empirical macro workflow.
+This example demonstrates univariate time series modeling with ARIMA models: estimation, order selection, diagnostics, and forecasting.
+
+```julia
+using MacroEconometricModels
+using Random
+using Statistics
+
+Random.seed!(42)
+
+# Generate ARMA(1,1) data
+T = 300
+y = zeros(T)
+e = randn(T)
+for t in 2:T
+    y[t] = 0.7 * y[t-1] + e[t] + 0.3 * e[t-1]
+end
+
+# === AR(2) via OLS ===
+ar = estimate_ar(y, 2)
+println("AR(2) Estimation")
+println("  Coefficients: ", round.(coef(ar), digits=4))
+println("  AIC: ", round(aic(ar), digits=2))
+println("  BIC: ", round(bic(ar), digits=2))
+
+# === ARMA(1,1) via CSS-MLE ===
+arma = estimate_arma(y, 1, 1)
+println("\nARMA(1,1) Estimation")
+println("  AR coef: ", round(arma.ar_coefs[1], digits=4))
+println("  MA coef: ", round(arma.ma_coefs[1], digits=4))
+println("  AIC: ", round(aic(arma), digits=2))
+
+# === Automatic order selection ===
+best = auto_arima(y)
+println("\nauto_arima selection:")
+println("  Best model: ARIMA($(best.p),$(best.d),$(best.q))")
+println("  AIC: ", round(aic(best), digits=2))
+
+# === Information criteria table ===
+ict = ic_table(y, 4, 4)
+println("\nIC table (top 5 by AIC):")
+for i in 1:min(5, size(ict, 1))
+    println("  p=$(Int(ict[i,1])), q=$(Int(ict[i,2])): AIC=$(round(ict[i,3], digits=1)), BIC=$(round(ict[i,4], digits=1))")
+end
+
+# === Forecast ===
+fc = forecast(arma, 12; conf_level=0.95)
+println("\nARMA(1,1) Forecasts:")
+for h in [1, 4, 8, 12]
+    println("  h=$h: $(round(fc.forecast[h], digits=3)) [$(round(fc.ci_lower[h], digits=3)), $(round(fc.ci_upper[h], digits=3))]")
+end
+```
+
+The `auto_arima` function performs a grid search over (p,d,q) combinations, selecting the model that minimizes AIC. The CSS-MLE estimation method initializes parameters via conditional sum of squares (CSS), then refines via exact maximum likelihood using the Kalman filter. Forecast confidence intervals widen with the horizon, reflecting accumulating prediction uncertainty.
+
+---
+
+## Example 2: Volatility Models
+
+This example estimates ARCH, GARCH, EGARCH, and GJR-GARCH models on the same data, compares their news impact curves, runs diagnostics, and forecasts volatility. See also [Volatility Models](volatility.md) for theory and return value tables.
+
+```julia
+using MacroEconometricModels
+using Random
+using Statistics
+
+Random.seed!(42)
+
+# === Generate GARCH(1,1) data with leverage effect ===
+T = 1000
+y = zeros(T)
+h = zeros(T)
+h[1] = 1.0
+
+for t in 2:T
+    z = randn()
+    h[t] = 0.01 + 0.08 * y[t-1]^2 + 0.12 * (y[t-1] < 0 ? 1 : 0) * y[t-1]^2 + 0.85 * h[t-1]
+    y[t] = sqrt(h[t]) * z
+end
+
+println("Simulated T=$T observations from GJR-GARCH(1,1)")
+println("Sample kurtosis: ", round(kurtosis(y), digits=2))
+
+# === Step 1: Test for ARCH effects ===
+stat, pval, q = arch_lm_test(y, 5)
+println("\nARCH-LM test (q=5): stat=$(round(stat, digits=2)), p=$(round(pval, digits=6))")
+
+stat2, pval2, K = ljung_box_squared(y, 10)
+println("Ljung-Box squared (K=10): stat=$(round(stat2, digits=2)), p=$(round(pval2, digits=6))")
+
+# === Step 2: Estimate competing models ===
+garch   = estimate_garch(y, 1, 1)
+egarch  = estimate_egarch(y, 1, 1)
+gjr     = estimate_gjr_garch(y, 1, 1)
+
+println("\n" * "="^60)
+println("Model Comparison")
+println("="^60)
+println("              AIC         BIC     Persistence")
+println("  GARCH:   ", round(aic(garch), digits=1),
+        "    ", round(bic(garch), digits=1),
+        "    ", round(persistence(garch), digits=4))
+println("  EGARCH:  ", round(aic(egarch), digits=1),
+        "    ", round(bic(egarch), digits=1),
+        "    ", round(persistence(egarch), digits=4))
+println("  GJR:     ", round(aic(gjr), digits=1),
+        "    ", round(bic(gjr), digits=1),
+        "    ", round(persistence(gjr), digits=4))
+
+# === Step 3: News impact curves ===
+nic_g  = news_impact_curve(garch)
+nic_e  = news_impact_curve(egarch)
+nic_j  = news_impact_curve(gjr)
+
+println("\nNews Impact at epsilon = -2 vs epsilon = +2:")
+idx_neg = findfirst(x -> x >= -2.0, nic_g.shocks)
+idx_pos = findfirst(x -> x >= 2.0, nic_g.shocks)
+
+println("  GARCH:  var(-2) = ", round(nic_g.variance[idx_neg], digits=4),
+        "   var(+2) = ", round(nic_g.variance[idx_pos], digits=4))
+println("  EGARCH: var(-2) = ", round(nic_e.variance[idx_neg], digits=4),
+        "   var(+2) = ", round(nic_e.variance[idx_pos], digits=4))
+println("  GJR:    var(-2) = ", round(nic_j.variance[idx_neg], digits=4),
+        "   var(+2) = ", round(nic_j.variance[idx_pos], digits=4))
+
+# === Step 4: Residual diagnostics ===
+println("\nResidual ARCH-LM test (q=5):")
+for (name, m) in [("GARCH", garch), ("EGARCH", egarch), ("GJR", gjr)]
+    _, p, _ = arch_lm_test(m, 5)
+    status = p > 0.05 ? "Pass" : "FAIL"
+    println("  $name: p=$(round(p, digits=4))  $status")
+end
+
+# === Step 5: Volatility forecasts ===
+H = 20
+fc_g = forecast(garch, H)
+fc_e = forecast(egarch, H)
+fc_j = forecast(gjr, H)
+
+println("\nVolatility forecasts (conditional variance):")
+println("  h    GARCH    EGARCH   GJR      Uncond")
+for h_idx in [1, 5, 10, 20]
+    println("  $h_idx    ",
+            round(fc_g.forecast[h_idx], digits=4), "  ",
+            round(fc_e.forecast[h_idx], digits=4), "  ",
+            round(fc_j.forecast[h_idx], digits=4), "  ",
+            round(unconditional_variance(garch), digits=4))
+end
+
+# === Step 6: Stochastic Volatility ===
+println("\nEstimating SV model via MCMC...")
+sv = estimate_sv(y; n_samples=2000, n_adapts=1000)
+
+println("SV posterior summary:")
+println("  mu:      ", round(mean(sv.mu_post), digits=3))
+println("  phi:     ", round(mean(sv.phi_post), digits=3))
+println("  sigma_eta: ", round(mean(sv.sigma_eta_post), digits=3))
+
+fc_sv = forecast(sv, H)
+println("\nSV forecast at h=1:  ", round(fc_sv.forecast[1], digits=4))
+println("SV forecast at h=20: ", round(fc_sv.forecast[end], digits=4))
+```
+
+The GJR-GARCH model should provide the best fit (lowest AIC/BIC) since the data was generated from a GJR-GARCH DGP with a leverage effect. The news impact curves reveal the asymmetry: for EGARCH and GJR-GARCH, the variance response to ``\varepsilon = -2`` exceeds that for ``\varepsilon = +2``; for symmetric GARCH, they are equal. All models' standardized residuals should pass the ARCH-LM test after fitting, confirming that the variance dynamics are adequately captured.
+
+---
+
+## Example 8: Unit Root Testing and Pre-Estimation Analysis
+
+This example demonstrates comprehensive unit root testing before fitting VAR models. Pre-estimation analysis is the first step in any empirical macro workflow. See [Hypothesis Tests](hypothesis_tests.md) for theoretical background.
 
 ### Individual Unit Root Tests
 
@@ -318,7 +489,7 @@ result = pre_estimation_analysis(Y_macro; var_names=var_names)
 
 ---
 
-## Example 2: Three-Variable VAR Analysis
+## Example 3: Three-Variable VAR Analysis
 
 This example walks through a complete analysis of a macroeconomic VAR with GDP growth, inflation, and the federal funds rate.
 
@@ -443,7 +614,7 @@ The FEVD shows the proportion of each variable's forecast error variance attribu
 
 ---
 
-## Example 3: Non-Gaussian SVAR Identification
+## Example 7: Non-Gaussian Structural Identification
 
 When structural shocks are non-Gaussian, statistical independence provides identification without imposing economic restrictions like recursive ordering or sign constraints. This example demonstrates the full non-Gaussian identification workflow: testing for non-Gaussianity, ICA-based and ML-based identification, and post-estimation specification tests.
 
@@ -715,7 +886,7 @@ When the true DGP is recursive (lower-triangular ``B_0``), Cholesky and ICA shou
 
 ---
 
-## Example 4: Bayesian VAR with Minnesota Prior
+## Example 6: Bayesian VAR with Minnesota Prior
 
 This example demonstrates Bayesian estimation with automatic hyperparameter optimization.
 
@@ -793,7 +964,7 @@ end
 
 ---
 
-## Example 5: Local Projections
+## Example 4: Local Projections
 
 This example demonstrates various LP methods for estimating impulse responses.
 
@@ -916,7 +1087,7 @@ println("  p-value: ", round(diff_test.joint_test.p_value, digits=4))
 
 ---
 
-## Example 6: Factor Model for Large Panels
+## Example 5: Factor Model for Large Panels
 
 This example demonstrates factor extraction and selection from a large macroeconomic panel.
 
@@ -1079,7 +1250,7 @@ The DFM supports four CI methods: `:theoretical` (fastest, assumes Gaussian inno
 
 ---
 
-## Example 7: GMM Estimation
+## Example 9: GMM Estimation
 
 This example demonstrates GMM estimation of a simple model with moment conditions.
 
@@ -1166,7 +1337,7 @@ The GMM estimates should be close to the true values ``\beta = [1.0, 2.0]`` when
 
 ---
 
-## Example 8: Complete Workflow
+## Example 10: Complete Workflow
 
 This example shows a complete empirical workflow combining multiple techniques.
 
@@ -1268,7 +1439,7 @@ Comparing VAR and LP impulse responses at the same horizon provides a robustness
 
 ---
 
-## Example 9: Table Output — Text, LaTeX, and HTML
+## Example 11: Table Output — Text, LaTeX, and HTML
 
 All `show`, `print_table`, and `Base.show` methods in MacroEconometricModels route through a unified PrettyTables backend. Switching from terminal text to LaTeX or HTML output requires a single call to `set_display_backend`. This is useful for embedding results directly into papers (LaTeX), slides (HTML), or reports.
 
@@ -1516,6 +1687,83 @@ irfs   # Displays as an HTML table
 | `set_display_backend(:latex)` | Nothing | LaTeX `\begin{tabular}` output |
 | `set_display_backend(:html)` | Nothing | HTML `<table>` output |
 | `get_display_backend()` | `Symbol` | Check current backend |
+
+---
+
+## Example 12: Bibliographic References
+
+The `refs()` function returns bibliographic references for any model, result type, or identification method. References are available in four formats: AEA text (default), BibTeX, LaTeX `\bibitem`, and HTML with clickable DOI links.
+
+### Basic Usage
+
+```julia
+using MacroEconometricModels
+using Random
+
+Random.seed!(42)
+
+# Estimate a model
+Y = randn(200, 3)
+for t in 2:200
+    Y[t, :] = 0.5 * Y[t-1, :] + 0.3 * randn(3)
+end
+model = estimate_var(Y, 2)
+
+# Get references for this model type (AEA text format)
+refs(model)
+```
+
+Output:
+```
+Sims, Christopher A. 1980. "Macroeconomics and Reality." Econometrica 48 (1): 1-48.
+Lutkepohl, Helmut. 2005. New Introduction to Multiple Time Series Analysis. Berlin: Springer.
+```
+
+### Multiple Output Formats
+
+```julia
+# BibTeX format — paste into your .bib file
+refs(model; format=:bibtex)
+
+# LaTeX \bibitem format
+refs(model; format=:latex)
+
+# HTML with clickable DOI links
+refs(model; format=:html)
+```
+
+### References by Method Name
+
+```julia
+# References for identification methods
+refs(:cholesky)       # Cholesky decomposition
+refs(:fastica)        # FastICA for SVAR
+refs(:sign)           # Sign restrictions
+refs(:johansen)       # Johansen cointegration
+refs(:garch)          # GARCH models
+
+# References for specific result types
+garch = estimate_garch(randn(500), 1, 1)
+refs(garch)           # Bollerslev (1986)
+
+sv = estimate_sv(randn(500); n_samples=500, n_adapts=200)
+refs(sv)              # Taylor (1986)
+```
+
+### Export to .bib File
+
+```julia
+# Write BibTeX entries for all models used in your analysis
+open("references.bib", "w") do io
+    refs(io, model; format=:bibtex)
+    println(io)
+    refs(io, :fastica; format=:bibtex)
+    println(io)
+    refs(io, :johansen; format=:bibtex)
+end
+```
+
+The `refs()` function covers all 45+ references in the package's database, including every estimation method, identification scheme, and test. This ensures correct citation of the methods used in your empirical analysis.
 
 ---
 
