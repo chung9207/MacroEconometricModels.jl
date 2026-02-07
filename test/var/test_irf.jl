@@ -1,6 +1,5 @@
 using MacroEconometricModels
 using Test
-using MCMCChains
 using LinearAlgebra
 using Statistics
 using Random
@@ -62,12 +61,11 @@ Random.seed!(42)
     # 4. Bayesian IRF
     println("Testing Bayesian Estimation...")
     try
-        # Estimate chain (reduced from n_samples=200, n_adapts=100)
-        chain = estimate_bvar(Y, p; n_samples=50, n_adapts=25, sampler=:nuts)
+        post = estimate_bvar(Y, p; n_draws=50)
         println("Bayesian Estimation Done.")
 
         println("Testing Bayesian IRF...")
-        irf_bayes = irf(chain, p, n, 6; method=:cholesky)
+        irf_bayes = irf(post, 6; method=:cholesky)
         println("Bayesian IRF Done.")
 
         @test irf_bayes isa BayesianImpulseResponse

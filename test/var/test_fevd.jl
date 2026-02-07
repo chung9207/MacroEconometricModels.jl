@@ -58,10 +58,10 @@ using Random
     # 2. Bayesian FEVD
     println("Testing Bayesian FEVD...")
     try
-        chain = estimate_bvar(Y, p; n_samples=50, n_adapts=25, sampler=:nuts)
+        post = estimate_bvar(Y, p; n_draws=50)
 
         # Compute Bayesian FEVD
-        fevd_bayes = fevd(chain, p, n, horizon; method=:cholesky)
+        fevd_bayes = fevd(post, horizon; method=:cholesky)
 
         # Check Mean Proportions
         # Structure: BayesianFEVD.mean is [Horizon, Var, Shock]

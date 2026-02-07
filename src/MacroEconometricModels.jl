@@ -33,7 +33,7 @@ lp_result = estimate_lp(Y, 1, 20; cov_type=:newey_west)
 lp_irf_result = lp_irf(lp_result)
 
 # Bayesian estimation
-chain = estimate_bvar(Y, 2; prior=:minnesota)
+post = estimate_bvar(Y, 2; prior=:minnesota)
 ```
 
 # References
@@ -76,6 +76,7 @@ include("var/types.jl")
 include("var/estimation.jl")
 
 # Bayesian estimation
+include("bvar/types.jl")
 include("bvar/priors.jl")
 include("bvar/estimation.jl")
 
@@ -226,6 +227,7 @@ export select_lag_order
 # Exports - Bayesian Estimation
 # =============================================================================
 
+export BVARPosterior
 export estimate_bvar
 export posterior_mean_model
 export posterior_median_model

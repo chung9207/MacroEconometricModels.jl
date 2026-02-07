@@ -1,6 +1,5 @@
 using MacroEconometricModels
 using Test
-using MCMCChains
 using LinearAlgebra
 using Statistics
 using Random
@@ -40,13 +39,13 @@ Random.seed!(42)
 
     # 2. Test Estimation with Minnesota Prior
     println("Estimating BVAR with Minnesota...")
-    chain = estimate_bvar(Y, p; n_samples=50, n_adapts=20, prior=:minnesota, hyper=hyper)
+    post = estimate_bvar(Y, p; n_draws=100, prior=:minnesota, hyper=hyper)
 
-    @test chain isa Chains
-    @test size(chain, 1) == 50
+    @test post isa BVARPosterior
+    @test post.n_draws == 100
+    @test post.prior == :minnesota
 
     # Basic check: posterior mean should be somewhat reasonable (within bounds)
-    # Just checking it runs and returns.
     println("Estimation Complete.")
 
     # 3. Test optimize_hyperparameters_full

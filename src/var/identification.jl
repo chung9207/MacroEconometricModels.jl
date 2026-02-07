@@ -391,20 +391,22 @@ end
 # --- Bayesian Integration ---
 
 """
-    identify_arias_bayesian(chain, p, n, restrictions, horizon; data=nothing, n_rotations=100, quantiles=[0.16,0.5,0.84])
+    identify_arias_bayesian(post::BVARPosterior, restrictions, horizon; data=nothing, n_rotations=100, quantiles=[0.16,0.5,0.84])
 
 Apply Arias identification to each posterior draw. Returns IRF quantiles, mean, acceptance rates.
 """
-function identify_arias_bayesian(chain, p::Int, n::Int, restrictions::SVARRestrictions, horizon::Int;
+function identify_arias_bayesian(post::BVARPosterior, restrictions::SVARRestrictions, horizon::Int;
     data::Union{Nothing,AbstractMatrix}=nothing, n_rotations::Int=100, quantiles::Vector{Float64}=[0.16, 0.5, 0.84])
 
-    b_vecs, sigmas = extract_chain_parameters(chain)
+    use_data = isnothing(data) ? (isempty(post.data) ? nothing : post.data) : data
+    p, n = post.p, post.n
+    b_vecs, sigmas = extract_chain_parameters(post)
     n_samples = size(b_vecs, 1)
     all_irfs, all_weights = Vector{Array{Float64,3}}(), Float64[]
     acc_rates = zeros(n_samples)
 
     for s in 1:n_samples
-        m = parameters_to_model(b_vecs[s,:], sigmas[s,:], p, n, data)
+        m = parameters_to_model(b_vecs[s,:], sigmas[s,:], p, n, use_data)
         try
             result = identify_arias(m, restrictions, horizon; n_draws=1, n_rotations=n_rotations)
             for (i, w) in enumerate(result.weights)
@@ -437,6 +439,11 @@ function identify_arias_bayesian(chain, p::Int, n::Int, restrictions::SVARRestri
     end
 
     (irf_quantiles=irf_q, irf_mean=irf_m, acceptance_rates=acc_rates, total_accepted=n_acc, weights=w_norm)
+end
+
+# Deprecated wrapper for old (chain, p, n, ...) signature
+function identify_arias_bayesian(post::BVARPosterior, p::Int, n::Int, restrictions::SVARRestrictions, horizon::Int; kwargs...)
+    identify_arias_bayesian(post, restrictions, horizon; kwargs...)
 end
 
 """Weighted quantile via linear interpolation."""

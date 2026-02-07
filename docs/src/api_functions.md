@@ -31,24 +31,36 @@ auto_arima
 ic_table
 ```
 
+### ARIMA Accessors
+
+```@docs
+ar_order
+ma_order
+diff_order
+```
+
 ---
 
 ## VAR Estimation
 
 ### Frequentist Estimation
 
-```@autodocs
-Modules = [MacroEconometricModels]
-Pages   = ["var/estimation.jl"]
-Order   = [:function]
+```@docs
+estimate_var
+select_lag_order
+MacroEconometricModels.StatsAPI.vcov(::VARModel)
+MacroEconometricModels.StatsAPI.predict
+MacroEconometricModels.StatsAPI.r2(::VARModel)
+MacroEconometricModels.StatsAPI.loglikelihood(::VARModel)
+MacroEconometricModels.StatsAPI.confint(::VARModel)
 ```
 
 ### Bayesian Estimation
 
-```@autodocs
-Modules = [MacroEconometricModels]
-Pages   = ["bvar/estimation.jl"]
-Order   = [:function]
+```@docs
+estimate_bvar
+posterior_mean_model
+posterior_median_model
 ```
 
 ### Prior Specification
@@ -323,6 +335,20 @@ test_shock_gaussianity
 test_gaussian_vs_nongaussian
 test_shock_independence
 test_overidentification
+```
+
+---
+
+## Covariance Estimators
+
+```@docs
+newey_west
+white_vcov
+driscoll_kraay
+robust_vcov
+long_run_variance
+long_run_covariance
+optimal_bandwidth_nw
 ```
 
 ---

@@ -508,7 +508,7 @@ end
 
     # Estimate :normal once and reuse across subtests
     Random.seed!(909)
-    m_normal = estimate_sv(y_sv; n_samples=100, n_adapts=50, dist=:normal)
+    m_normal = estimate_sv(y_sv; n_samples=100, burnin=50, dist=:normal)
 
     @testset "Basic SV" begin
         @test m_normal isa SVModel{Float64}
@@ -545,7 +545,7 @@ end
 
     @testset "SV Student-t" begin
         Random.seed!(1010)
-        m_t = estimate_sv(y_sv; n_samples=100, n_adapts=50, dist=:studentt)
+        m_t = estimate_sv(y_sv; n_samples=100, burnin=50, dist=:studentt)
         @test m_t isa SVModel{Float64}
         @test m_t.dist == :studentt
         @test all(m_t.volatility_mean .> 0)
@@ -623,7 +623,7 @@ end
     @testset "SVModel display" begin
         Random.seed!(1313)
         y_sv = randn(100) .* exp.(cumsum(0.1 .* randn(100)) ./ 2)
-        m = estimate_sv(y_sv; n_samples=50, n_adapts=20)
+        m = estimate_sv(y_sv; n_samples=50, burnin=20)
         io = IOBuffer()
         show(io, m)
         output = String(take!(io))

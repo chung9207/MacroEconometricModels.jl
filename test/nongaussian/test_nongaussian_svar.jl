@@ -512,15 +512,15 @@ using StatsAPI
 
     @testset "BVAR Non-Gaussian Identification" begin
         Random.seed!(77777)
-        chain = estimate_bvar(Y, 2; n_samples=30, n_adapts=20)
+        post = estimate_bvar(Y, 2; n_draws=30)
         for method in [:fastica, :student_t]
-            irf_r = irf(chain, 2, n, 10; method=method, data=Y)
+            irf_r = irf(post, 10; method=method)
             @test irf_r isa MacroEconometricModels.BayesianImpulseResponse
 
-            f = fevd(chain, 2, n, 10; method=method, data=Y)
+            f = fevd(post, 10; method=method)
             @test f isa MacroEconometricModels.BayesianFEVD
 
-            hd_r = historical_decomposition(chain, 2, n, n_obs - 2; data=Y, method=method)
+            hd_r = historical_decomposition(post, n_obs - 2; data=Y, method=method)
             @test hd_r isa MacroEconometricModels.BayesianHistoricalDecomposition
         end
     end

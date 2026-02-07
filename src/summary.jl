@@ -1693,6 +1693,21 @@ const _REFERENCES = Dict{Symbol, _RefEntry}(
         title="Modelling Financial Time Series", journal="",
         volume="", issue="", pages="", doi="",
         isbn="978-0-471-90993-4", publisher="Wiley", entry_type=:book),
+    :kim_shephard_chib1998 => (key=:kim_shephard_chib1998,
+        authors="Kim, Sangjoon and Shephard, Neil and Chib, Siddhartha", year=1998,
+        title="Stochastic Volatility: Likelihood Inference and Comparison with ARCH Models",
+        journal="Review of Economic Studies", volume="65", issue="3", pages="361--393",
+        doi="10.1111/1467-937X.00050", isbn="", publisher="", entry_type=:article),
+    :omori2007 => (key=:omori2007,
+        authors="Omori, Yasuhiro and Chib, Siddhartha and Shephard, Neil and Nakajima, Jouchi", year=2007,
+        title="Stochastic Volatility with Leverage: Fast and Efficient Likelihood Inference",
+        journal="Journal of Econometrics", volume="140", issue="2", pages="425--449",
+        doi="10.1016/j.jeconom.2006.07.008", isbn="", publisher="", entry_type=:article),
+    :giannone_lenza_primiceri2015 => (key=:giannone_lenza_primiceri2015,
+        authors="Giannone, Domenico and Lenza, Michele and Primiceri, Giorgio E.", year=2015,
+        title="Prior Selection for Vector Autoregressions",
+        journal="Review of Economics and Statistics", volume="97", issue="2", pages="436--451",
+        doi="10.1162/REST_a_00483", isbn="", publisher="", entry_type=:article),
 )
 
 # --- Type/method → reference keys mapping ---
@@ -1710,6 +1725,8 @@ const _TYPE_REFS = Dict{Symbol, Vector{Symbol}}(
     :SVARRestrictions => [:arias_rubio_ramirez_waggoner2018],
     # Bayesian VAR
     :MinnesotaHyperparameters => [:litterman1986, :kadiyala_karlsson1997],
+    :BVARPosterior => [:litterman1986, :kadiyala_karlsson1997, :giannone_lenza_primiceri2015],
+    :bvar => [:litterman1986, :kadiyala_karlsson1997, :giannone_lenza_primiceri2015],
     # Identification methods (symbol dispatch)
     :cholesky => [:sims1980, :lutkepohl2005],
     :long_run => [:blanchard_quah1989],
@@ -1795,13 +1812,13 @@ const _TYPE_REFS = Dict{Symbol, Vector{Symbol}}(
     :GARCHModel => [:bollerslev1986],
     :EGARCHModel => [:nelson1991],
     :GJRGARCHModel => [:glosten_jagannathan_runkle1993],
-    :SVModel => [:taylor1986],
+    :SVModel => [:taylor1986, :kim_shephard_chib1998, :omori2007],
     :VolatilityForecast => [:engle1982, :bollerslev1986],
     :arch => [:engle1982],
     :garch => [:bollerslev1986],
     :egarch => [:nelson1991],
     :gjr_garch => [:glosten_jagannathan_runkle1993],
-    :sv => [:taylor1986],
+    :sv => [:taylor1986, :kim_shephard_chib1998, :omori2007],
 )
 
 # ICA method → additional ref keys (appended to ICASVARResult base refs)
@@ -1994,6 +2011,7 @@ refs(io::IO, ::BayesianHistoricalDecomposition; kw...) = refs(io, _TYPE_REFS[:Ba
 refs(io::IO, ::AriasSVARResult; kw...) = refs(io, _TYPE_REFS[:AriasSVARResult]; kw...)
 refs(io::IO, ::SVARRestrictions; kw...) = refs(io, _TYPE_REFS[:SVARRestrictions]; kw...)
 refs(io::IO, ::MinnesotaHyperparameters; kw...) = refs(io, _TYPE_REFS[:MinnesotaHyperparameters]; kw...)
+refs(io::IO, ::BVARPosterior; kw...) = refs(io, _TYPE_REFS[:BVARPosterior]; kw...)
 
 # LP types
 refs(io::IO, ::LPModel; kw...) = refs(io, _TYPE_REFS[:LPModel]; kw...)

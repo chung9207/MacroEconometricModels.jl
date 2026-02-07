@@ -33,6 +33,16 @@ AbstractVARModel
 
 ---
 
+## Analysis Result Types
+
+```@docs
+AbstractAnalysisResult
+AbstractFrequentistResult
+AbstractBayesianResult
+```
+
+---
+
 ## Impulse Response and FEVD
 
 ```@docs
@@ -93,6 +103,14 @@ GMMWeighting
 ```@docs
 MinnesotaHyperparameters
 AbstractPrior
+```
+
+---
+
+## Bayesian Posterior Types
+
+```@docs
+BVARPosterior
 ```
 
 ---
@@ -178,6 +196,12 @@ AbstractARIMAModel <: StatsAPI.RegressionModel
 AbstractVARModel
 └── VARModel{T}
 
+AbstractAnalysisResult
+├── AbstractFrequentistResult
+│     ├── ImpulseResponse{T}, FEVD{T}, HistoricalDecomposition{T}
+└── AbstractBayesianResult
+      ├── BayesianImpulseResponse{T}, BayesianFEVD{T}, BayesianHistoricalDecomposition{T}
+
 AbstractImpulseResponse
 ├── ImpulseResponse{T}
 ├── BayesianImpulseResponse{T}
@@ -220,6 +244,8 @@ AbstractGMMModel
 
 AbstractPrior
 └── MinnesotaHyperparameters{T}
+
+BVARPosterior{T}
 
 AbstractUnitRootTest <: StatsAPI.HypothesisTest
 ├── ADFResult{T}

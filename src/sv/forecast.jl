@@ -7,7 +7,7 @@ Stochastic Volatility posterior predictive forecasting.
 
 Posterior predictive forecast of volatility from an SV model.
 
-For each MCMC draw (μ, φ, σ_η), simulates the log-volatility path forward
+For each posterior draw (μ, φ, σ_η), simulates the log-volatility path forward
 h_{T+1}, ..., h_{T+h} and returns quantiles of exp(hₜ).
 
 # Arguments
@@ -27,9 +27,8 @@ function forecast(m::SVModel{T}, h::Int; conf_level::T=T(0.95)) where {T}
         phi = m.phi_post[s]
         sigma_eta = m.sigma_eta_post[s]
 
-        # Get last latent state from chain
-        h_sym = Symbol("h[$n_obs]")
-        h_last = T(m.chain[h_sym].data[s])
+        # Get last latent state from stored draws
+        h_last = m.h_draws[s, n_obs]
 
         h_prev = h_last
         for t in 1:h

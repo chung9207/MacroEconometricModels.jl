@@ -11,7 +11,7 @@ This chapter provides comprehensive worked examples demonstrating the main funct
 | 3 | Three-Variable VAR | `estimate_var`, `irf`, `fevd` | Frequentist VAR with Cholesky and sign restriction identification |
 | 4 | Local Projections | `estimate_lp`, `estimate_lp_iv`, `estimate_smooth_lp` | Standard, IV, smooth, and state-dependent LP |
 | 5 | Factor Model for Large Panels | `estimate_factors`, `ic_criteria`, `forecast` | Large panel factor extraction, Bai-Ng criteria, forecasting with CIs |
-| 6 | Bayesian VAR with Minnesota Prior | `estimate_bvar`, `optimize_hyperparameters` | Minnesota prior, MCMC estimation, credible intervals |
+| 6 | Bayesian VAR with Minnesota Prior | `estimate_bvar`, `optimize_hyperparameters` | Minnesota prior, conjugate posterior estimation, credible intervals |
 | 7 | Non-Gaussian Structural Identification | `identify_fastica`, `normality_test_suite`, `test_shock_gaussianity` | ICA, ML, heteroskedastic identification |
 | 8 | Unit Root Testing | `adf_test`, `kpss_test`, `johansen_test` | ADF, KPSS, Zivot-Andrews, Ng-Perron, Johansen |
 | 9 | GMM Estimation | `estimate_gmm`, `j_test` | IV regression via GMM, overidentification test |
@@ -172,8 +172,8 @@ for h_idx in [1, 5, 10, 20]
 end
 
 # === Step 6: Stochastic Volatility ===
-println("\nEstimating SV model via MCMC...")
-sv = estimate_sv(y; n_samples=2000, n_adapts=1000)
+println("\nEstimating SV model via KSC Gibbs sampler...")
+sv = estimate_sv(y; n_samples=2000, burnin=1000)
 
 println("SV posterior summary:")
 println("  mu:      ", round(mean(sv.mu_post), digits=3))
@@ -906,28 +906,27 @@ println("  d (lag decay): ", best_hyper.d)
 
 The optimal `tau` value reflects the degree of shrinkage that maximizes the marginal likelihood. A small `tau` (e.g., 0.05) means strong shrinkage toward the random walk prior, appropriate for large systems or short samples. A larger `tau` (e.g., 0.5-1.0) allows the data more influence, appropriate when the sample is informative relative to the model complexity.
 
-### BVAR Estimation with MCMC
+### BVAR Estimation
 
 ```julia
 # Estimate BVAR with optimized Minnesota prior
-println("\nEstimating BVAR with MCMC...")
-chain = estimate_bvar(Y, p;
-    n_samples = 2000,
-    n_adapts = 500,
+println("\nEstimating BVAR with conjugate NIW sampler...")
+post = estimate_bvar(Y, p;
+    n_draws = 1000,
     prior = :minnesota,
     hyper = best_hyper
 )
 
 # Posterior summary (coefficients from first equation)
 println("\nPosterior summary for GDP equation:")
-# Access posterior draws and compute statistics
+# Access posterior draws: post.B_draws, post.Sigma_draws
 ```
 
 ### Bayesian IRF with Credible Intervals
 
 ```julia
 # Bayesian IRF with Cholesky identification
-birf_chol = irf(chain, p, n, H; method=:cholesky)
+birf_chol = irf(post, H; method=:cholesky)
 
 # Extract median and 68% credible intervals
 # birf_chol.quantiles is (H+1) × n × n × 3 array
@@ -948,7 +947,7 @@ end
 
 ```julia
 # Bayesian IRF with sign restrictions
-birf_sign = irf(chain, p, n, H;
+birf_sign = irf(post, H;
     method = :sign,
     check_func = check_demand_shock
 )
@@ -1400,12 +1399,12 @@ println("="^50)
 best_hyper = optimize_hyperparameters(Y, p; grid_size=15)
 println("Optimal τ: ", round(best_hyper.tau, digits=4))
 
-# BVAR with MCMC
-chain = estimate_bvar(Y, p; n_samples=1000, n_adapts=300,
-                      prior=:minnesota, hyper=best_hyper)
+# BVAR with conjugate NIW sampler
+post = estimate_bvar(Y, p; n_draws=1000,
+                     prior=:minnesota, hyper=best_hyper)
 
 # Bayesian IRF
-birf = irf(chain, p, n, H; method=:cholesky)
+birf = irf(post, H; method=:cholesky)
 
 # === Step 6: Local Projections Comparison ===
 println("\n" * "="^50)
@@ -1746,8 +1745,8 @@ refs(:garch)          # GARCH models
 garch = estimate_garch(randn(500), 1, 1)
 refs(garch)           # Bollerslev (1986)
 
-sv = estimate_sv(randn(500); n_samples=500, n_adapts=200)
-refs(sv)              # Taylor (1986)
+sv = estimate_sv(randn(500); n_samples=500, burnin=200)
+refs(sv)              # Taylor (1986), Kim et al. (1998), Omori et al. (2007)
 ```
 
 ### Export to .bib File

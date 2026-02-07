@@ -259,7 +259,7 @@ pct = irf_percentiles(result; probs=[0.16, 0.5, 0.84])
 println("Median IRF(1→1, h=0): ", round(pct[1, 1, 1, 2], digits=3))
 
 # Bayesian version
-# bresult = identify_arias_bayesian(chain, p, n, restrictions, 20)
+# bresult = identify_arias_bayesian(post, restrictions, 20)
 ```
 
 The acceptance rate indicates what fraction of random draws satisfy all restrictions simultaneously. Low rates (below 1%) suggest the restrictions may be nearly contradictory or overly stringent. The importance weights correct for non-uniform sampling induced by zero restrictions — the weighted percentiles provide correctly calibrated credible intervals.
@@ -295,7 +295,7 @@ For comprehensive coverage of Bayesian VAR estimation, see the dedicated [Bayesi
 
 - Minnesota/Litterman prior specification
 - Hyperparameter optimization via marginal likelihood (Giannone, Lenza & Primiceri, 2015)
-- MCMC estimation with Turing.jl
+- Conjugate NIW posterior sampling
 - Posterior inference and credible intervals
 
 ---

@@ -565,15 +565,15 @@ end
 
         # Estimate BVAR
         try
-            chain = estimate_bvar(Y, p; n_samples=50, n_adapts=20)
+            post = estimate_bvar(Y, p; n_draws=50)
 
             # Define sign restrictions
             signs = [sign_restriction(1, 1, :positive)]
             restrictions = SVARRestrictions(n; signs=signs)
 
             # Run Bayesian identification
-            result = identify_arias_bayesian(chain, p, n, restrictions, 5;
-                data=Y, n_rotations=50, quantiles=[0.16, 0.5, 0.84])
+            result = identify_arias_bayesian(post, restrictions, 5;
+                n_rotations=50, quantiles=[0.16, 0.5, 0.84])
 
             # Check output structure
             @test haskey(result, :irf_quantiles)
@@ -585,7 +585,7 @@ end
             # Check dimensions
             @test size(result.irf_quantiles) == (5, n, n, 3)  # horizon × n × n × quantiles
             @test size(result.irf_mean) == (5, n, n)
-            @test length(result.acceptance_rates) == 50  # n_samples from chain
+            @test length(result.acceptance_rates) == 50  # n_draws from posterior
             @test length(result.weights) == result.total_accepted
 
             # Check weights sum to 1
@@ -613,7 +613,7 @@ end
         Y = randn(T_obs, n)
 
         try
-            chain = estimate_bvar(Y, p; n_samples=30, n_adapts=15)
+            post = estimate_bvar(Y, p; n_draws=30)
 
             # Cholesky-equivalent zero restrictions
             zeros = [
@@ -623,8 +623,8 @@ end
             ]
             restrictions = SVARRestrictions(n; zeros=zeros)
 
-            result = identify_arias_bayesian(chain, p, n, restrictions, 5;
-                data=Y, n_rotations=100)
+            result = identify_arias_bayesian(post, restrictions, 5;
+                n_rotations=100)
 
             @test result.total_accepted > 0
             @test all(isfinite, result.irf_mean)
@@ -642,14 +642,14 @@ end
         Y = randn(T_obs, n)
 
         try
-            chain = estimate_bvar(Y, p; n_samples=40, n_adapts=20)
+            post = estimate_bvar(Y, p; n_draws=40)
 
             zeros = [zero_restriction(2, 1)]
             signs = [sign_restriction(1, 1, :positive)]
             restrictions = SVARRestrictions(n; zeros=zeros, signs=signs)
 
-            result = identify_arias_bayesian(chain, p, n, restrictions, 5;
-                data=Y, n_rotations=100)
+            result = identify_arias_bayesian(post, restrictions, 5;
+                n_rotations=100)
 
             @test result.total_accepted > 0
             @test size(result.irf_mean) == (5, n, n)
@@ -667,14 +667,14 @@ end
         Y = randn(T_obs, n)
 
         try
-            chain = estimate_bvar(Y, p; n_samples=30, n_adapts=15)
+            post = estimate_bvar(Y, p; n_draws=30)
 
             signs = [sign_restriction(1, 1, :positive)]
             restrictions = SVARRestrictions(n; signs=signs)
 
             # Run without providing data
-            result = identify_arias_bayesian(chain, p, n, restrictions, 5;
-                data=nothing, n_rotations=50)
+            result = identify_arias_bayesian(post, restrictions, 5;
+                n_rotations=50)
 
             @test result.total_accepted > 0
             @test all(isfinite, result.irf_mean)
@@ -692,15 +692,15 @@ end
         Y = randn(T_obs, n)
 
         try
-            chain = estimate_bvar(Y, p; n_samples=30, n_adapts=15)
+            post = estimate_bvar(Y, p; n_draws=30)
 
             signs = [sign_restriction(1, 1, :positive)]
             restrictions = SVARRestrictions(n; signs=signs)
 
             # Custom quantiles
             custom_q = [0.05, 0.25, 0.5, 0.75, 0.95]
-            result = identify_arias_bayesian(chain, p, n, restrictions, 5;
-                data=Y, n_rotations=50, quantiles=custom_q)
+            result = identify_arias_bayesian(post, restrictions, 5;
+                n_rotations=50, quantiles=custom_q)
 
             @test size(result.irf_quantiles, 4) == length(custom_q)
 
@@ -724,13 +724,13 @@ end
         Y = randn(T_obs, n)
 
         try
-            chain = estimate_bvar(Y, p; n_samples=30, n_adapts=15)
+            post = estimate_bvar(Y, p; n_draws=30)
 
             signs = [sign_restriction(1, 1, :positive)]
             restrictions = SVARRestrictions(n; signs=signs)
 
-            result = identify_arias_bayesian(chain, p, n, restrictions, 5;
-                data=Y, n_rotations=50)
+            result = identify_arias_bayesian(post, restrictions, 5;
+                n_rotations=50)
 
             @test result.total_accepted > 0
             @test size(result.irf_mean) == (5, 1, 1)

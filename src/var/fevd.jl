@@ -2,7 +2,7 @@
 Forecast Error Variance Decomposition for frequentist and Bayesian VAR models.
 """
 
-using LinearAlgebra, Statistics, MCMCChains
+using LinearAlgebra, Statistics
 
 # =============================================================================
 # Frequentist FEVD
@@ -58,9 +58,9 @@ end
 # =============================================================================
 
 """
-    fevd(chain, p, n, horizon; quantiles=[0.16, 0.5, 0.84], ...) -> BayesianFEVD
+    fevd(post::BVARPosterior, horizon; quantiles=[0.16, 0.5, 0.84], ...) -> BayesianFEVD
 
-Compute Bayesian FEVD from MCMC chain with posterior quantiles.
+Compute Bayesian FEVD from posterior draws with posterior quantiles.
 
 # Methods
 `:cholesky`, `:sign`, `:narrative`, `:long_run`,
@@ -77,25 +77,27 @@ Uses `process_posterior_samples` and `compute_posterior_quantiles` from bayesian
 # Structural LP FEVD — see lp_fevd.jl (Gorodnichenko & Lee 2019)
 # =============================================================================
 
-function fevd(chain::Chains, p::Int, n::Int, horizon::Int;
+function fevd(post::BVARPosterior, horizon::Int;
     method::Symbol=:cholesky, data::AbstractMatrix=Matrix{Float64}(undef, 0, 0),
     check_func=nothing, narrative_check=nothing, quantiles::Vector{<:Real}=[0.16, 0.5, 0.84],
     threaded::Bool=false,
     transition_var::Union{Nothing,AbstractVector}=nothing,
     regime_indicator::Union{Nothing,AbstractVector{Int}}=nothing
 )
-    _validate_narrative_data(method, data)
+    use_data = isempty(data) ? post.data : data
+    _validate_narrative_data(method, use_data)
 
-    ET = isempty(data) ? Float64 : eltype(data)
+    n = post.n
+    ET = eltype(use_data)
 
     # Process posterior samples - compute FEVD proportions for each
-    results, samples = process_posterior_samples(chain, p, n,
+    results, samples = process_posterior_samples(post,
         (m, Q, h) -> begin
             irf_vals = compute_irf(m, Q, h)
             _, props = _compute_fevd(irf_vals, nvars(m), h)
             props  # Returns (n, n, horizon)
         end;
-        data=data, method=method, horizon=horizon,
+        data=use_data, method=method, horizon=horizon,
         check_func=check_func, narrative_check=narrative_check,
         transition_var=transition_var, regime_indicator=regime_indicator
     )
@@ -114,4 +116,9 @@ function fevd(chain::Chains, p::Int, n::Int, horizon::Int;
     fevd_q, fevd_m = compute_posterior_quantiles(all_fevds, q_vec; threaded=use_threaded)
 
     BayesianFEVD{ET}(fevd_q, fevd_m, horizon, default_var_names(n), default_shock_names(n), q_vec)
+end
+
+# Deprecated wrapper for old (chain, p, n, horizon) signature
+function fevd(post::BVARPosterior, p::Int, n::Int, horizon::Int; kwargs...)
+    fevd(post, horizon; kwargs...)
 end

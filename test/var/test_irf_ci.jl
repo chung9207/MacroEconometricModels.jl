@@ -249,8 +249,8 @@ using Statistics
     @testset "Bayesian IRF - Credible Intervals" begin
         Random.seed!(12360)
         try
-            chain = estimate_bvar(Y, p; n_samples=50, sampler=:is)
-            irf_bayes = irf(chain, p, n, H)
+            post = estimate_bvar(Y, p; n_draws=50)
+            irf_bayes = irf(post, H)
 
             @test size(irf_bayes.quantiles, 4) == 3  # [16th, 50th, 84th percentile]
             # Ordering: 16th <= 50th <= 84th

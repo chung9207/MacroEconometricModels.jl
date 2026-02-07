@@ -2,8 +2,6 @@
 Type definitions and StatsAPI interface for Stochastic Volatility models.
 """
 
-using MCMCChains
-
 # =============================================================================
 # SV Model Type
 # =============================================================================
@@ -11,13 +9,13 @@ using MCMCChains
 """
     SVModel{T} <: AbstractVolatilityModel
 
-Stochastic Volatility model (Taylor 1986), estimated via Bayesian MCMC:
+Stochastic Volatility model (Taylor 1986), estimated via Kim-Shephard-Chib (1998) Gibbs sampler:
     yₜ = exp(hₜ/2) εₜ,       εₜ ~ N(0,1)
     hₜ = μ + φ(hₜ₋₁ - μ) + σ_η ηₜ,  ηₜ ~ N(0,1)
 
 # Fields
 - `y::Vector{T}`: Original data
-- `chain::Chains`: Full MCMC chain
+- `h_draws::Matrix{T}`: Posterior draws of latent log-volatilities (n_samples × n_obs)
 - `mu_post::Vector{T}`: Posterior draws of μ (log-variance level)
 - `phi_post::Vector{T}`: Posterior draws of φ (persistence)
 - `sigma_eta_post::Vector{T}`: Posterior draws of σ_η (volatility of volatility)
@@ -30,7 +28,7 @@ Stochastic Volatility model (Taylor 1986), estimated via Bayesian MCMC:
 """
 struct SVModel{T<:AbstractFloat} <: AbstractVolatilityModel
     y::Vector{T}
-    chain::Chains
+    h_draws::Matrix{T}          # n_samples × n_obs
     mu_post::Vector{T}
     phi_post::Vector{T}
     sigma_eta_post::Vector{T}

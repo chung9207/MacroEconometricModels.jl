@@ -1,149 +1,257 @@
 """
-Bayesian VAR estimation via Turing.jl with MCMC sampling.
+Bayesian VAR estimation via conjugate Normal-Inverse-Wishart posterior.
+
+Two samplers:
+- `:direct` (default) — i.i.d. draws from the analytical posterior (no burnin needed)
+- `:gibbs` — Two-block Gibbs sampler with burnin/thinning (for diagnostics/extensions)
 """
-
-using Turing, MCMCChains, LinearAlgebra
-
-# =============================================================================
-# Turing Models
-# =============================================================================
-
-"""Vectorized BVAR model for gradient-based samplers (NUTS, HMC, HMCDA).
-Uses diagonal covariance for numerical stability with ForwardDiff AD."""
-@model function var_bayes_vectorized(Y_eff::Matrix{T}, X::Matrix{T}, p::Int, n::Int) where {T<:AbstractFloat}
-    # Diagonal covariance: sigma_i^2 for each variable
-    # This is numerically stable and works well for VAR estimation
-    log_sigma ~ filldist(Normal(T(0), T(1)), n)
-    sigma = exp.(log_sigma)
-
-    k = 1 + n * p
-    b_vec ~ MvNormal(zeros(T, k * n), T(10) * I)
-    B = reshape(b_vec, k, n)
-
-    mu = X * B
-
-    # Independent normal likelihood per variable (diagonal covariance)
-    T_eff = size(Y_eff, 1)
-    for i in 1:n
-        Y_eff[:, i] ~ MvNormal(mu[:, i], sigma[i] * I)
-    end
-end
-
-"""Sequential BVAR model with full covariance for particle-based samplers (SMC, PG).
-Uses InverseWishart for compatibility with particle samplers (no AD required)."""
-@model function var_bayes_sequential(Y_eff::Matrix{T}, X::Matrix{T}, p::Int, n::Int) where {T<:AbstractFloat}
-    # For particle samplers, InverseWishart works fine (no AD)
-    Sigma ~ InverseWishart(n + 2, Matrix{T}(I, n, n))
-    k = 1 + n * p
-    b_vec ~ MvNormal(zeros(T, k * n), T(10) * I)
-    B = reshape(b_vec, k, n)
-    mu = X * B
-
-    for t in 1:size(Y_eff, 1)
-        Y_eff[t, :] ~ MvNormal(mu[t, :], Sigma)
-    end
-end
-
-# =============================================================================
-# Sampler Configuration
-# =============================================================================
-
-@enum SamplerType SAMPLER_NUTS SAMPLER_HMC SAMPLER_HMCDA SAMPLER_IS SAMPLER_SMC SAMPLER_PG
-
-"""Create Turing sampler from symbol. Supports: :nuts, :hmc, :hmcda, :is, :smc, :pg."""
-function get_sampler(sampler_type::Symbol, n_adapts::Int, args::NamedTuple)
-    sampler_type == :nuts && return NUTS(n_adapts, 0.65)
-    sampler_type == :hmc && return HMC(get(args, :epsilon, 0.1), get(args, :n_leapfrog, 10))
-    sampler_type == :hmcda && return HMCDA(n_adapts, get(args, :delta, 0.65), get(args, :lambda, 0.3))
-    sampler_type == :is && return IS()
-    sampler_type == :smc && return SMC(get(args, :n_particles, 100))
-    sampler_type == :pg && return PG(get(args, :n_particles, 20))
-    throw(ArgumentError("Unknown sampler: $sampler_type. Use :nuts, :hmc, :hmcda, :is, :smc, :pg"))
-end
-
-requires_sequential_model(s::Symbol) = s in (:smc, :pg)
 
 # =============================================================================
 # Main Estimation
 # =============================================================================
 
 """
-    estimate_bvar(Y, p; n_samples=1000, n_adapts=500, prior=:normal, hyper=nothing,
-                  sampler=:nuts, sampler_args=(;)) -> Chains
+    estimate_bvar(Y, p; n_draws=1000, sampler=:direct, burnin=0, thin=1,
+                  prior=:normal, hyper=nothing) -> BVARPosterior
 
-Estimate Bayesian VAR via Turing.jl MCMC.
+Estimate Bayesian VAR via conjugate Normal-Inverse-Wishart posterior.
 
-Samplers: :nuts (default), :hmc, :hmcda, :is, :smc, :pg.
-Prior: :normal (default) or :minnesota with optional `hyper::MinnesotaHyperparameters`.
+# Model
+    Y = X B + E,    E ~ MN(0, Σ, I_T)
+    Prior: Σ ~ IW(ν₀, S₀),  vec(B)|Σ ~ N(b₀, Σ ⊗ V₀)
+
+# Samplers
+- `:direct` (default) — i.i.d. draws from analytical posterior. `burnin` and `thin` are ignored.
+- `:gibbs` — Standard two-block Gibbs sampler. `burnin` defaults to 200 if not specified.
+
+# Arguments
+- `Y::AbstractMatrix`: T × n data matrix
+- `p::Int`: Number of lags
+
+# Keyword Arguments
+- `n_draws::Int=1000`: Number of posterior draws to keep
+- `sampler::Symbol=:direct`: Sampling algorithm (`:direct` or `:gibbs`)
+- `burnin::Int=0`: Burnin period (only for `:gibbs`; defaults to 200 when sampler=:gibbs and burnin=0)
+- `thin::Int=1`: Thinning interval (only for `:gibbs`)
+- `prior::Symbol=:normal`: Prior type (`:normal` or `:minnesota`)
+- `hyper::Union{Nothing,MinnesotaHyperparameters}=nothing`: Minnesota hyperparameters.
+  When `prior=:minnesota` and `hyper=nothing`, tau is automatically optimized via
+  marginal likelihood maximization (Giannone, Lenza & Primiceri 2015). Pass an explicit
+  `MinnesotaHyperparameters(...)` to use fixed values instead.
+
+# Returns
+`BVARPosterior{T}` containing coefficient and covariance draws.
+
+# Example
+```julia
+Y = randn(200, 3)
+post = estimate_bvar(Y, 2; n_draws=1000)
+post_mn = estimate_bvar(Y, 2; prior=:minnesota, n_draws=500)
+```
 """
 function estimate_bvar(Y::AbstractMatrix{T}, p::Int;
-    n_samples::Int=1000, n_adapts::Int=500, prior::Symbol=:normal,
-    hyper::Union{Nothing,MinnesotaHyperparameters}=nothing,
-    sampler::Symbol=:nuts, sampler_args::NamedTuple=(;)
+    n_draws::Int=1000, sampler::Symbol=:direct,
+    burnin::Int=0, thin::Int=1,
+    prior::Symbol=:normal,
+    hyper::Union{Nothing,MinnesotaHyperparameters}=nothing
 ) where {T<:AbstractFloat}
 
     T_obs, n = size(Y)
     validate_var_inputs(T_obs, n, p)
 
     Y_eff, X = construct_var_matrices(Y, p)
+    T_eff = size(Y_eff, 1)
+    k = size(X, 2)  # 1 + n*p
 
     # Apply Minnesota prior augmentation if requested
     Y_data, X_data = if prior == :minnesota
-        h = isnothing(hyper) ? MinnesotaHyperparameters() : hyper
+        h = isnothing(hyper) ? optimize_hyperparameters(Y_eff, p) : hyper
         Y_d, X_d = gen_dummy_obs(Y, p, h)
         (vcat(Y_eff, Y_d), vcat(X, X_d))
     else
         (Y_eff, X)
     end
 
-    model = requires_sequential_model(sampler) ?
-        var_bayes_sequential(Y_data, X_data, p, n) :
-        var_bayes_vectorized(Y_data, X_data, p, n)
+    T_data = size(Y_data, 1)
 
-    sample(model, get_sampler(sampler, n_adapts, sampler_args), n_samples; progress=true)
+    # Set up prior hyperparameters
+    # Prior: vec(B) | Σ ~ N(b₀, Σ ⊗ V₀), Σ ~ IW(ν₀, S₀)
+    # Diffuse prior: V₀ = κ·I (large κ), ν₀ = n+2, S₀ = I
+    κ = T(100.0)
+    V0_inv = (one(T) / κ) * Matrix{T}(I, k, k)
+    B0 = zeros(T, k, n)
+    ν0 = n + 2
+    S0 = Matrix{T}(I, n, n)
+
+    # Posterior parameters (conjugate update)
+    XtX = X_data' * X_data
+    XtY = X_data' * Y_data
+    V_post_inv = XtX + V0_inv
+    V_post = robust_inv(V_post_inv)
+    V_post = T(0.5) * (V_post + V_post')  # Ensure symmetry
+    B_post = V_post * (XtY + V0_inv * B0)
+    ν_post = ν0 + T_data
+    S_post = S0 + Y_data' * Y_data + B0' * V0_inv * B0 - B_post' * V_post_inv * B_post
+    S_post = T(0.5) * (S_post + S_post')  # Ensure symmetry
+
+    if sampler == :direct
+        return _sample_direct(Y, p, n, k, n_draws, B_post, V_post, ν_post, S_post, prior)
+    elseif sampler == :gibbs
+        eff_burnin = burnin == 0 ? 200 : burnin
+        return _sample_gibbs(Y, p, n, k, n_draws, eff_burnin, thin,
+                             Y_data, X_data, V0_inv, B0, ν0, S0, prior)
+    else
+        throw(ArgumentError("Unknown sampler: $sampler. Use :direct or :gibbs"))
+    end
 end
 
 @float_fallback estimate_bvar Y
 
 # =============================================================================
-# Chain Parameter Extraction
+# Direct (i.i.d.) Sampler
+# =============================================================================
+
+"""Draw i.i.d. samples from the conjugate Normal-Inverse-Wishart posterior."""
+function _sample_direct(Y::Matrix{T}, p::Int, n::Int, k::Int, n_draws::Int,
+                        B_post::Matrix{T}, V_post::Matrix{T},
+                        ν_post::Int, S_post::Matrix{T}, prior::Symbol) where {T<:AbstractFloat}
+
+    B_draws = Array{T,3}(undef, n_draws, k, n)
+    Sigma_draws = Array{T,3}(undef, n_draws, n, n)
+
+    # Cholesky of V_post for efficient sampling
+    L_V = safe_cholesky(V_post)
+
+    for s in 1:n_draws
+        # Step 1: Draw Σ ~ IW(ν_post, S_post)
+        Sigma = _draw_inverse_wishart(ν_post, S_post)
+
+        # Step 2: Draw B | Σ ~ MN(B_post, V_post, Σ)
+        #   vec(B) ~ N(vec(B_post), Σ ⊗ V_post)
+        #   Efficient: B = B_post + L_V * Z * L_Σ' where Z ~ N(0, I_{k×n})
+        L_Sigma = safe_cholesky(Sigma)
+        Z = randn(T, k, n)
+        B = B_post + L_V * Z * L_Sigma'
+
+        B_draws[s, :, :] = B
+        Sigma_draws[s, :, :] = Sigma
+    end
+
+    BVARPosterior{T}(B_draws, Sigma_draws, n_draws, p, n, Matrix{T}(Y), prior, :direct)
+end
+
+# =============================================================================
+# Gibbs Sampler
+# =============================================================================
+
+"""Two-block Gibbs sampler for Normal-Inverse-Wishart posterior."""
+function _sample_gibbs(Y::Matrix{T}, p::Int, n::Int, k::Int,
+                       n_draws::Int, burnin::Int, thin::Int,
+                       Y_data::Matrix{T}, X_data::Matrix{T},
+                       V0_inv::Matrix{T}, B0::Matrix{T},
+                       ν0::Int, S0::Matrix{T}, prior::Symbol) where {T<:AbstractFloat}
+
+    B_draws = Array{T,3}(undef, n_draws, k, n)
+    Sigma_draws = Array{T,3}(undef, n_draws, n, n)
+
+    # Initialize from OLS
+    B_curr = robust_inv(X_data' * X_data) * (X_data' * Y_data)
+    resid = Y_data - X_data * B_curr
+    Sigma_curr = (resid' * resid) / size(Y_data, 1)
+    Sigma_curr = T(0.5) * (Sigma_curr + Sigma_curr')
+
+    XtX = X_data' * X_data
+
+    total_iters = burnin + n_draws * thin
+    draw_idx = 0
+
+    for s in 1:total_iters
+        # Block 1: Draw B | Σ, Y
+        V_post_inv = XtX + V0_inv
+        V_post = robust_inv(V_post_inv)
+        V_post = T(0.5) * (V_post + V_post')
+        B_post = V_post * (X_data' * Y_data + V0_inv * B0)
+
+        L_V = safe_cholesky(V_post)
+        L_Sigma = safe_cholesky(Sigma_curr)
+        Z = randn(T, k, n)
+        B_curr = B_post + L_V * Z * L_Sigma'
+
+        # Block 2: Draw Σ | B, Y
+        resid = Y_data - X_data * B_curr
+        S_post = S0 + resid' * resid
+        S_post = T(0.5) * (S_post + S_post')
+        ν_post = ν0 + size(Y_data, 1)
+        Sigma_curr = _draw_inverse_wishart(ν_post, S_post)
+
+        # Store after burnin, with thinning
+        if s > burnin && (s - burnin - 1) % thin == 0
+            draw_idx += 1
+            draw_idx > n_draws && break
+            B_draws[draw_idx, :, :] = B_curr
+            Sigma_draws[draw_idx, :, :] = Sigma_curr
+        end
+    end
+
+    BVARPosterior{T}(B_draws, Sigma_draws, n_draws, p, n, Matrix{T}(Y), prior, :gibbs)
+end
+
+# =============================================================================
+# Inverse-Wishart Sampler
 # =============================================================================
 
 """
-    extract_chain_parameters(chain::Chains) -> (b_vecs, sigmas)
-
-Extract coefficient vectors and covariance matrices from MCMC chain.
-Handles both diagonal (gradient samplers) and InverseWishart (particle samplers) parameterizations.
+Draw from Inverse-Wishart(ν, S) distribution.
+Uses the Bartlett decomposition: if X ~ W(ν, S⁻¹), then X⁻¹ ~ IW(ν, S).
 """
-function extract_chain_parameters(chain::Chains)
-    b_vecs = Array(group(chain, :b_vec))
+function _draw_inverse_wishart(ν::Int, S::AbstractMatrix{T}) where {T<:AbstractFloat}
+    n = size(S, 1)
+    L_S_inv = safe_cholesky(robust_inv(S))
 
-    # Check which parameterization was used
-    param_names = string.(names(chain))
-    has_log_sigma = any(startswith.(param_names, Ref("log_sigma")))
-
-    if has_log_sigma
-        # Diagonal covariance parameterization: reconstruct Sigma from log_sigma
-        log_sigma_arr = Array(group(chain, :log_sigma))
-        sigma_arr = exp.(log_sigma_arr)
-
-        n_samples = size(b_vecs, 1)
-        n_chains = size(b_vecs, 3)
-        n = size(sigma_arr, 2)
-
-        # Construct diagonal covariance matrices
-        sigmas = zeros(n_samples, n * n, n_chains)
-        for c in 1:n_chains
-            for s in 1:n_samples
-                Sigma = Diagonal(sigma_arr[s, :, c] .^ 2)
-                sigmas[s, :, c] = vec(Matrix(Sigma))
-            end
+    # Bartlett decomposition of Wishart
+    A = zeros(T, n, n)
+    for i in 1:n
+        A[i, i] = sqrt(rand(Chisq(T(ν - i + 1))))
+        for j in 1:(i-1)
+            A[i, j] = randn(T)
         end
-        return (b_vecs, sigmas)
-    else
-        # InverseWishart parameterization: Sigma stored directly
-        return (b_vecs, Array(group(chain, :Sigma)))
     end
+
+    # W = L * A * A' * L'  where L = chol(S⁻¹)
+    LA = L_S_inv * A
+    W = LA * LA'
+
+    # Σ = W⁻¹
+    Sigma = robust_inv(W)
+    T(0.5) * (Sigma + Sigma')
+end
+
+# =============================================================================
+# Chain Parameter Extraction (BVARPosterior interface)
+# =============================================================================
+
+"""
+    extract_chain_parameters(post::BVARPosterior) -> (b_vecs, sigmas)
+
+Extract coefficient vectors and covariance matrices from posterior draws.
+Returns matrices compatible with downstream `parameters_to_model` calls.
+
+- `b_vecs`: n_draws × (k*n) matrix of vectorized coefficients
+- `sigmas`: n_draws × (n*n) matrix of vectorized covariance matrices
+"""
+function extract_chain_parameters(post::BVARPosterior{T}) where {T}
+    n_draws = post.n_draws
+    k, n = size(post.B_draws, 2), post.n
+
+    b_vecs = Matrix{T}(undef, n_draws, k * n)
+    sigmas = Matrix{T}(undef, n_draws, n * n)
+
+    @inbounds for s in 1:n_draws
+        b_vecs[s, :] = vec(post.B_draws[s, :, :])
+        sigmas[s, :] = vec(post.Sigma_draws[s, :, :])
+    end
+
+    (b_vecs, sigmas)
 end
 
 """Convert chain parameters to VARModel. Provide `data` for residual computation."""
@@ -172,13 +280,24 @@ end
 # =============================================================================
 
 """VARModel with posterior mean parameters."""
-function posterior_mean_model(chain::Chains, p::Int, n::Int; data::AbstractMatrix=Matrix{Float64}(undef, 0, 0))
-    b, s = extract_chain_parameters(chain)
-    parameters_to_model(vec(mean(b, dims=1)), vec(mean(s, dims=1)), p, n, data)
+function posterior_mean_model(post::BVARPosterior{T}; data::AbstractMatrix=Matrix{T}(undef, 0, 0)) where {T}
+    use_data = isempty(data) ? post.data : Matrix{T}(data)
+    b, s = extract_chain_parameters(post)
+    parameters_to_model(vec(mean(b, dims=1)), vec(mean(s, dims=1)), post.p, post.n, use_data)
 end
 
 """VARModel with posterior median parameters."""
-function posterior_median_model(chain::Chains, p::Int, n::Int; data::AbstractMatrix=Matrix{Float64}(undef, 0, 0))
-    b, s = extract_chain_parameters(chain)
-    parameters_to_model(vec(median(b, dims=1)), vec(median(s, dims=1)), p, n, data)
+function posterior_median_model(post::BVARPosterior{T}; data::AbstractMatrix=Matrix{T}(undef, 0, 0)) where {T}
+    use_data = isempty(data) ? post.data : Matrix{T}(data)
+    b, s = extract_chain_parameters(post)
+    parameters_to_model(vec(median(b, dims=1)), vec(median(s, dims=1)), post.p, post.n, use_data)
+end
+
+# Deprecated wrappers (old Chains-based signatures)
+function posterior_mean_model(post::BVARPosterior, p::Int, n::Int; data::AbstractMatrix=Matrix{Float64}(undef, 0, 0))
+    posterior_mean_model(post; data=data)
+end
+
+function posterior_median_model(post::BVARPosterior, p::Int, n::Int; data::AbstractMatrix=Matrix{Float64}(undef, 0, 0))
+    posterior_median_model(post; data=data)
 end

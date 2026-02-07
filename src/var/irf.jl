@@ -2,7 +2,7 @@
 Impulse Response Functions for frequentist and Bayesian VAR models.
 """
 
-using LinearAlgebra, Statistics, MCMCChains
+using LinearAlgebra, Statistics
 
 # =============================================================================
 # Frequentist IRF
@@ -114,9 +114,9 @@ end
 # =============================================================================
 
 """
-    irf(chain, p, n, horizon; method=:cholesky, quantiles=[0.16, 0.5, 0.84], ...)
+    irf(post::BVARPosterior, horizon; method=:cholesky, quantiles=[0.16, 0.5, 0.84], ...)
 
-Compute Bayesian IRFs from MCMC chain with posterior quantiles.
+Compute Bayesian IRFs from posterior draws with posterior quantiles.
 
 # Methods
 `:cholesky`, `:sign`, `:narrative`, `:long_run`,
@@ -129,21 +129,23 @@ Note: `:smooth_transition` requires `transition_var` kwarg.
 
 Uses `process_posterior_samples` and `compute_posterior_quantiles` from bayesian_utils.jl.
 """
-function irf(chain::Chains, p::Int, n::Int, horizon::Int;
+function irf(post::BVARPosterior, horizon::Int;
     method::Symbol=:cholesky, data::AbstractMatrix=Matrix{Float64}(undef, 0, 0),
     check_func=nothing, narrative_check=nothing, quantiles::Vector{<:Real}=[0.16, 0.5, 0.84],
     threaded::Bool=false,
     transition_var::Union{Nothing,AbstractVector}=nothing,
     regime_indicator::Union{Nothing,AbstractVector{Int}}=nothing
 )
-    _validate_narrative_data(method, data)
+    use_data = isempty(data) ? post.data : data
+    _validate_narrative_data(method, use_data)
 
-    ET = isempty(data) ? Float64 : eltype(data)
+    n = post.n
+    ET = eltype(use_data)
 
     # Process posterior samples using shared utility
-    results, samples = process_posterior_samples(chain, p, n,
+    results, samples = process_posterior_samples(post,
         (m, Q, h) -> compute_irf(m, Q, h);
-        data=data, method=method, horizon=horizon,
+        data=use_data, method=method, horizon=horizon,
         check_func=check_func, narrative_check=narrative_check,
         transition_var=transition_var, regime_indicator=regime_indicator
     )
@@ -157,6 +159,11 @@ function irf(chain::Chains, p::Int, n::Int, horizon::Int;
     irf_q, irf_m = compute_posterior_quantiles(all_irfs, q_vec; threaded=use_threaded)
 
     BayesianImpulseResponse{ET}(irf_q, irf_m, horizon, default_var_names(n), default_shock_names(n), q_vec)
+end
+
+# Deprecated wrapper for old (chain, p, n, horizon) signature
+function irf(post::BVARPosterior, p::Int, n::Int, horizon::Int; kwargs...)
+    irf(post, horizon; kwargs...)
 end
 
 # =============================================================================

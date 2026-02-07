@@ -7,7 +7,7 @@ Innovation accounting refers to the collection of tools for analyzing the dynami
 ```julia
 irfs = irf(model, 20; method=:cholesky)                          # Frequentist IRF
 irfs_ci = irf(model, 20; ci_type=:bootstrap, reps=1000)          # With bootstrap CI
-birfs = irf(chain, p, n, 20; method=:cholesky)                   # Bayesian IRF
+birfs = irf(post, 20; method=:cholesky)                          # Bayesian IRF
 decomp = fevd(model, 20)                                         # FEVD
 hd = historical_decomposition(model, 198)                        # Historical decomposition
 report(irfs)                                                      # Publication-quality summary
@@ -72,7 +72,7 @@ where ``\Theta^{cum}_H`` accumulates the impulse responses from impact through h
 3. Re-estimate the VAR and compute IRFs
 4. Repeat ``B`` times to build the distribution
 
-**Credible Intervals (Bayesian)**: For each MCMC draw, compute IRFs and report posterior quantiles (e.g., 16th and 84th percentiles for 68% intervals).
+**Credible Intervals (Bayesian)**: For each posterior draw, compute IRFs and report posterior quantiles (e.g., 16th and 84th percentiles for 68% intervals).
 
 ### Usage
 
@@ -96,7 +96,7 @@ irf_sign = irf(model, 20; method=:sign, sign_restrictions=sign_constraints)
 The basic `irf(model, 20)` call uses Cholesky identification by default. Adding `ci_type=:bootstrap` generates pointwise confidence bands via Kilian's (1998) residual bootstrap — `reps=1000` draws are recommended for publication-quality bands. Sign restrictions produce a set of admissible IRFs satisfying the constraints; the returned values are the median (or a representative draw), with the set-identified nature reflected in wider credible bands.
 
 !!! note "Technical Note"
-    The `ci_lower` and `ci_upper` arrays are only populated when `ci_type=:bootstrap` (frequentist) or when using the Bayesian `irf(chain, ...)` method. With `ci_type=:none` (the default), these arrays contain zeros. Always check `irf_result.ci_type` before interpreting confidence bands.
+    The `ci_lower` and `ci_upper` arrays are only populated when `ci_type=:bootstrap` (frequentist) or when using the Bayesian `irf(post, ...)` method. With `ci_type=:none` (the default), these arrays contain zeros. Always check `irf_result.ci_type` before interpreting confidence bands.
 
 ### ImpulseResponse Return Values
 

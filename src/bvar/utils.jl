@@ -10,18 +10,18 @@ The main functions are:
 - `compute_posterior_quantiles_threaded!`: Threaded version for large arrays
 """
 
-using LinearAlgebra, Statistics, MCMCChains
+using LinearAlgebra, Statistics
 
 # =============================================================================
 # Posterior Sample Processing
 # =============================================================================
 
 """
-    process_posterior_samples(chain::Chains, p::Int, n::Int, compute_func::Function;
+    process_posterior_samples(post::BVARPosterior, compute_func::Function;
                               data, method, horizon, check_func, narrative_check,
                               max_draws, transition_var, regime_indicator) -> (Vector{Any}, Int)
 
-Generic framework for processing posterior samples from MCMC chain.
+Generic framework for processing posterior samples from BVARPosterior.
 
 # Process
 1. Extract chain parameters using `extract_chain_parameters`
@@ -30,13 +30,11 @@ Generic framework for processing posterior samples from MCMC chain.
 4. Apply `compute_func(model, Q, horizon)` to get result for each sample
 
 # Arguments
-- `chain::Chains`: MCMC chain from `estimate_bvar`
-- `p::Int`: Number of VAR lags
-- `n::Int`: Number of variables
+- `post::BVARPosterior`: Posterior draws from `estimate_bvar`
 - `compute_func::Function`: Function taking (model, Q, horizon) -> result
 
 # Keyword Arguments
-- `data::AbstractMatrix`: Original data (required for narrative method and residual computation)
+- `data::AbstractMatrix`: Override data (defaults to post.data)
 - `method::Symbol`: Identification method (see `compute_Q` for full list)
 - `horizon::Int`: IRF/computation horizon
 - `check_func`: Sign restriction check function (for method=:sign or :narrative)
@@ -52,35 +50,43 @@ Generic framework for processing posterior samples from MCMC chain.
 # Example
 ```julia
 # Compute IRF for each posterior sample
-results, n_samples = process_posterior_samples(chain, p, n,
+post = estimate_bvar(Y, 2; n_draws=500)
+results, n_samples = process_posterior_samples(post,
     (m, Q, h) -> compute_irf(m, Q, h);
     horizon=20, method=:cholesky
 )
 ```
 """
-function process_posterior_samples(chain::Chains, p::Int, n::Int, compute_func::Function;
+function process_posterior_samples(post::BVARPosterior, compute_func::Function;
     data::AbstractMatrix=Matrix{Float64}(undef, 0, 0),
     method::Symbol=:cholesky, horizon::Int=20,
     check_func=nothing, narrative_check=nothing, max_draws::Int=100,
     transition_var::Union{Nothing,AbstractVector}=nothing,
     regime_indicator::Union{Nothing,AbstractVector{Int}}=nothing
 )
-    method == :narrative && isempty(data) &&
+    use_data = isempty(data) ? post.data : data
+    method == :narrative && isempty(use_data) &&
         throw(ArgumentError("Narrative method requires data"))
 
-    samples = size(chain, 1)
-    b_vecs, sigmas = extract_chain_parameters(chain)
+    samples = post.n_draws
+    p, n = post.p, post.n
+    b_vecs, sigmas = extract_chain_parameters(post)
 
     results = Vector{Any}(undef, samples)
 
     for s in 1:samples
-        m = parameters_to_model(b_vecs[s, :], sigmas[s, :], p, n, data)
+        m = parameters_to_model(b_vecs[s, :], sigmas[s, :], p, n, use_data)
         Q = compute_Q(m, method, horizon, check_func, narrative_check;
                       max_draws=max_draws, transition_var=transition_var, regime_indicator=regime_indicator)
         results[s] = compute_func(m, Q, horizon)
     end
 
     results, samples
+end
+
+# Deprecated wrapper for old (chain, p, n) signature
+function process_posterior_samples(post::BVARPosterior, p::Int, n::Int, compute_func::Function; kwargs...)
+    process_posterior_samples(post, compute_func; kwargs...)
 end
 
 # =============================================================================

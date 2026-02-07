@@ -21,8 +21,8 @@ egarch = estimate_egarch(y, 1, 1)
 # GJR-GARCH(1,1) — Glosten, Jagannathan & Runkle (1993)
 gjr = estimate_gjr_garch(y, 1, 1)
 
-# Stochastic Volatility — Taylor (1986)
-sv = estimate_sv(y; n_samples=2000, n_adapts=1000)
+# Stochastic Volatility — Taylor (1986), Kim-Shephard-Chib (1998)
+sv = estimate_sv(y; n_samples=2000, burnin=1000)
 
 # Diagnostics
 arch_lm_test(y, 5)         # ARCH-LM test
@@ -349,7 +349,7 @@ where ``\nu > 2`` is the degrees of freedom parameter.
 
 ### Priors
 
-The SV model is estimated via Bayesian MCMC using Turing.jl. The default priors are:
+The SV model is estimated via the Kim-Shephard-Chib (1998) Gibbs sampler with the Omori et al. (2007) 10-component mixture approximation. The default priors are:
 
 | Parameter | Prior | Rationale |
 |-----------|-------|-----------|
@@ -359,17 +359,17 @@ The SV model is estimated via Bayesian MCMC using Turing.jl. The default priors 
 | ``\rho`` (leverage) | ``\text{Uniform}(-1, 1)`` | Uninformative over correlation range |
 | ``\nu`` (Student-t) | ``\text{Exponential}(0.1) + 2`` | Ensures ``\nu > 2`` (finite variance) |
 
-### MCMC Estimation
+### Estimation
 
 ```julia
 # Basic SV model
-sv = estimate_sv(y; n_samples=2000, n_adapts=1000)
+sv = estimate_sv(y; n_samples=2000, burnin=1000)
 
 # SV with leverage effect
-sv_lev = estimate_sv(y; leverage=true, n_samples=2000, n_adapts=1000)
+sv_lev = estimate_sv(y; leverage=true, n_samples=2000, burnin=1000)
 
 # SV with Student-t errors
-sv_t = estimate_sv(y; dist=:studentt, n_samples=2000, n_adapts=1000)
+sv_t = estimate_sv(y; dist=:studentt, n_samples=2000, burnin=1000)
 
 # Access posterior summaries
 mean(sv.mu_post)          # Posterior mean of μ
@@ -381,19 +381,19 @@ sv.volatility_mean        # Posterior mean of exp(hₜ) at each t
 sv.volatility_quantiles   # Quantiles (T × n_quantiles matrix)
 sv.quantile_levels        # Default: [0.025, 0.5, 0.975]
 
-# Full MCMC chain for convergence diagnostics
-sv.chain                  # MCMCChains.Chains object
+# Latent log-volatility draws
+sv.h_draws                # n_samples × T matrix of posterior hₜ draws
 ```
 
 !!! note "Technical Note"
-    MCMC estimation of SV models is computationally intensive because the latent log-volatility states ``h_1, \ldots, h_T`` must be sampled jointly with the model parameters. The NUTS sampler (No-U-Turn Sampler) is used by default for efficient exploration of the posterior. Typical run times are 1–3 minutes for ``T = 500`` with 2000 posterior draws.
+    The Kim-Shephard-Chib (1998) Gibbs sampler approximates the non-Gaussian observation equation ``\log y_t^2 = h_t + \log \varepsilon_t^2`` using a 10-component Gaussian mixture (Omori et al., 2007). Each Gibbs iteration: (1) samples the mixture indicators conditional on ``h``, (2) samples ``h_{1:T}`` via the simulation smoother conditional on parameters and indicators, and (3) samples ``(\mu, \varphi, \sigma_\eta)`` from their conditional posteriors. Typical run times are under 30 seconds for ``T = 500`` with 2000 posterior draws.
 
 ### SVModel Return Values
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `y` | `Vector{T}` | Original data |
-| `chain` | `Chains` | Full MCMC chain (Turing.jl) |
+| `h_draws` | `Matrix{T}` | Latent log-volatility draws (n_samples × T) |
 | `mu_post` | `Vector{T}` | Posterior draws of ``\mu`` |
 | `phi_post` | `Vector{T}` | Posterior draws of ``\varphi`` |
 | `sigma_eta_post` | `Vector{T}` | Posterior draws of ``\sigma_\eta`` |
@@ -442,7 +442,7 @@ fc_sv.ci_lower     # 2.5th percentile
 fc_sv.ci_upper     # 97.5th percentile
 ```
 
-For SV models, each MCMC draw provides a full parameter vector ``(\mu, \varphi, \sigma_\eta)``. The forecast simulates the log-volatility process forward from the last state for each draw, yielding a posterior predictive distribution of future volatility. The reported intervals are posterior predictive quantiles, not frequentist confidence intervals.
+For SV models, each posterior draw provides a full parameter vector ``(\mu, \varphi, \sigma_\eta)`` and the terminal log-volatility ``h_T``. The forecast simulates the log-volatility process forward from the last state for each draw, yielding a posterior predictive distribution of future volatility. The reported intervals are posterior predictive quantiles, not frequentist confidence intervals.
 
 ### VolatilityForecast Return Values
 
@@ -605,8 +605,8 @@ for h_idx in [1, 5, 10, 20]
 end
 
 # === Step 6: Stochastic volatility for comparison ===
-println("\nEstimating SV model via MCMC...")
-sv = estimate_sv(y; n_samples=2000, n_adapts=1000)
+println("\nEstimating SV model via KSC Gibbs sampler...")
+sv = estimate_sv(y; n_samples=2000, burnin=1000)
 
 println("SV posterior summary:")
 println("  μ (log-vol level):   ", round(mean(sv.mu_post), digits=3),
@@ -625,7 +625,7 @@ println("\nSV forecast at h=1: ", round(fc_sv.forecast[1], digits=4))
 println("SV forecast at h=20: ", round(fc_sv.forecast[end], digits=4))
 ```
 
-In this example, the GJR-GARCH model should provide the best fit (lowest AIC/BIC) since the data was generated from a GJR-GARCH DGP with a leverage effect. The news impact curves reveal the asymmetry: for EGARCH and GJR-GARCH, ``\sigma^2(-2)`` exceeds ``\sigma^2(+2)``; for symmetric GARCH, they are equal. All models' standardized residuals should pass the ARCH-LM test after fitting, confirming that the conditional variance dynamics are adequately captured. The SV model provides an independent, Bayesian assessment of the volatility dynamics.
+In this example, the GJR-GARCH model should provide the best fit (lowest AIC/BIC) since the data was generated from a GJR-GARCH DGP with a leverage effect. The news impact curves reveal the asymmetry: for EGARCH and GJR-GARCH, ``\sigma^2(-2)`` exceeds ``\sigma^2(+2)``; for symmetric GARCH, they are equal. All models' standardized residuals should pass the ARCH-LM test after fitting, confirming that the conditional variance dynamics are adequately captured. The SV model provides an independent, Bayesian assessment of the volatility dynamics via the Kim-Shephard-Chib (1998) Gibbs sampler.
 
 ---
 
@@ -636,4 +636,6 @@ In this example, the GJR-GARCH model should provide the best fit (lowest AIC/BIC
 - Engle, Robert F. 1982. "Autoregressive Conditional Heteroscedasticity with Estimates of the Variance of United Kingdom Inflation." *Econometrica* 50 (4): 987–1007. [https://doi.org/10.2307/1912773](https://doi.org/10.2307/1912773)
 - Glosten, Lawrence R., Ravi Jagannathan, and David E. Runkle. 1993. "On the Relation between the Expected Value and the Volatility of the Nominal Excess Return on Stocks." *Journal of Finance* 48 (5): 1779–1801. [https://doi.org/10.1111/j.1540-6261.1993.tb05128.x](https://doi.org/10.1111/j.1540-6261.1993.tb05128.x)
 - Nelson, Daniel B. 1991. "Conditional Heteroskedasticity in Asset Returns: A New Approach." *Econometrica* 59 (2): 347–370. [https://doi.org/10.2307/2938260](https://doi.org/10.2307/2938260)
+- Kim, Sangjoon, Neil Shephard, and Siddhartha Chib. 1998. "Stochastic Volatility: Likelihood Inference and Comparison with ARCH Models." *Review of Economic Studies* 65 (3): 361–393. [https://doi.org/10.1111/1467-937X.00050](https://doi.org/10.1111/1467-937X.00050)
+- Omori, Yasuhiro, Siddhartha Chib, Neil Shephard, and Jouchi Nakajima. 2007. "Stochastic Volatility with Leverage: Fast and Efficient Likelihood Inference." *Journal of Econometrics* 140 (2): 425–449. [https://doi.org/10.1016/j.jeconom.2006.07.008](https://doi.org/10.1016/j.jeconom.2006.07.008)
 - Taylor, Stephen J. 1986. *Modelling Financial Time Series*. Chichester: Wiley. ISBN 978-0-471-90975-7.

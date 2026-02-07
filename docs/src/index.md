@@ -9,7 +9,7 @@
 ### Key Features
 
 - **ARIMA Models**: AR, MA, ARMA, and ARIMA estimation via OLS, CSS, MLE (Kalman filter), and CSS-MLE; automatic order selection; multi-step forecasting with confidence intervals
-- **Volatility Models**: ARCH (Engle 1982), GARCH (Bollerslev 1986), EGARCH (Nelson 1991), GJR-GARCH (Glosten et al. 1993) via MLE with two-stage optimization; Stochastic Volatility (Taylor 1986) via Bayesian MCMC; news impact curves, ARCH-LM and Ljung-Box diagnostics, multi-step volatility forecasting with simulation-based CIs
+- **Volatility Models**: ARCH (Engle 1982), GARCH (Bollerslev 1986), EGARCH (Nelson 1991), GJR-GARCH (Glosten et al. 1993) via MLE with two-stage optimization; Stochastic Volatility (Taylor 1986) via Kim-Shephard-Chib (1998) Gibbs sampler; news impact curves, ARCH-LM and Ljung-Box diagnostics, multi-step volatility forecasting with simulation-based CIs
 - **Vector Autoregression (VAR)**: OLS estimation with comprehensive diagnostics, impulse response functions (IRFs), and forecast error variance decomposition (FEVD)
 - **Structural Identification**: Multiple identification schemes including Cholesky, sign restrictions, long-run (Blanchard-Quah), and narrative restrictions
 - **Bayesian VAR**: Minnesota/Litterman prior with automatic hyperparameter optimization via marginal likelihood (Giannone, Lenza & Primiceri, 2015)
@@ -41,7 +41,7 @@ Or from the Julia REPL package mode:
 using MacroEconometricModels
 model = estimate_var(Y, 2)                          # VAR(2) via OLS
 irfs = irf(model, 20; method=:cholesky)             # Impulse responses
-chain = estimate_bvar(Y, 2; prior=:minnesota)       # Bayesian VAR
+post = estimate_bvar(Y, 2; prior=:minnesota)        # Bayesian VAR
 lp = estimate_lp(Y, 1, 20; cov_type=:newey_west)   # Local Projections
 fm = estimate_factors(X, 3)                         # Factor model
 ar = estimate_ar(y, 2)                              # AR(2)
@@ -92,12 +92,12 @@ hyper = MinnesotaHyperparameters(
     omega = 1.0     # Deterministic terms
 )
 
-# Estimate BVAR with MCMC
-chain = estimate_bvar(Y, 2; n_samples=2000, n_adapts=500,
-                      prior=:minnesota, hyper=hyper)
+# Estimate BVAR with conjugate NIW sampler
+post = estimate_bvar(Y, 2; n_draws=1000,
+                     prior=:minnesota, hyper=hyper)
 
 # Bayesian IRF with credible intervals
-birf = irf(chain, 2, 3, 20; method=:cholesky)
+birf = irf(post, 20; method=:cholesky)
 ```
 
 ### Local Projections
@@ -214,8 +214,8 @@ nic = news_impact_curve(egarch)
 # Multi-step volatility forecast
 fc = forecast(garch, 20; conf_level=0.95)
 
-# Stochastic Volatility via MCMC
-sv = estimate_sv(y; n_samples=2000, n_adapts=1000)
+# Stochastic Volatility via KSC Gibbs sampler
+sv = estimate_sv(y; n_samples=2000, burnin=1000)
 ```
 
 ### Display Backends and References
@@ -244,9 +244,9 @@ The package is organized into the following modules:
 | `arima/` | ARIMA suite: types, Kalman filter, estimation (CSS/MLE), forecasting, order selection |
 | `arch/` | ARCH(q) estimation via MLE, volatility forecasting |
 | `garch/` | GARCH, EGARCH, GJR-GARCH estimation via MLE, news impact curves, forecasting |
-| `sv/` | Stochastic Volatility via Bayesian MCMC (Turing.jl), posterior predictive forecasts |
+| `sv/` | Stochastic Volatility via KSC (1998) Gibbs sampler, posterior predictive forecasts |
 | `var/` | VAR estimation (OLS), structural identification, IRF, FEVD, historical decomposition |
-| `bvar/` | Bayesian VAR: MCMC estimation, Minnesota prior, hyperparameter optimization |
+| `bvar/` | Bayesian VAR: conjugate NIW posterior sampling, Minnesota prior, hyperparameter optimization |
 | `lp/` | Local Projections: core, IV, smooth, state-dependent, propensity, structural LP, forecast, LP-FEVD |
 | `factor/` | Static (PCA), dynamic (two-step/EM), generalized (spectral) factor models with forecasting |
 | `nongaussian/` | Non-Gaussian structural identification: ICA, ML, heteroskedastic-ID |

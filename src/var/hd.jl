@@ -6,7 +6,7 @@ Theory: y_t = Σ_{s=0}^{t-1} Θ_s ε_{t-s} + initial_conditions
 where Θ_s = Φ_s * P (structural MA coefficients) and P = L * Q (impact matrix).
 """
 
-using LinearAlgebra, Statistics, MCMCChains, PrettyTables
+using LinearAlgebra, Statistics, PrettyTables
 
 # =============================================================================
 # Abstract Type
@@ -279,18 +279,16 @@ end
 # =============================================================================
 
 """
-    historical_decomposition(chain::Chains, p, n, horizon; data, ...) -> BayesianHistoricalDecomposition
+    historical_decomposition(post::BVARPosterior, horizon; data=..., ...) -> BayesianHistoricalDecomposition
 
-Compute Bayesian historical decomposition from MCMC chain with posterior quantiles.
+Compute Bayesian historical decomposition from posterior draws with posterior quantiles.
 
 # Arguments
-- `chain::Chains`: MCMC chain from `estimate_bvar`
-- `p::Int`: Number of lags
-- `n::Int`: Number of variables
+- `post::BVARPosterior`: Posterior draws from `estimate_bvar`
 - `horizon::Int`: Maximum horizon for MA coefficients
 
 # Keyword Arguments
-- `data::AbstractMatrix`: Original data matrix (required)
+- `data::AbstractMatrix`: Override data matrix (defaults to `post.data`)
 - `method::Symbol=:cholesky`: Identification method
 - `quantiles::Vector{<:Real}=[0.16, 0.5, 0.84]`: Posterior quantile levels
 - `check_func=nothing`: Sign restriction check function
@@ -312,34 +310,37 @@ Note: `:smooth_transition` requires `transition_var` kwarg.
 
 # Example
 ```julia
-chain = estimate_bvar(Y, 2; n_samples=500)
-hd = historical_decomposition(chain, 2, 3, 198; data=Y)
+post = estimate_bvar(Y, 2; n_draws=500)
+hd = historical_decomposition(post, 198)
 ```
 """
-function historical_decomposition(chain::Chains, p::Int, n::Int, horizon::Int;
-    data::AbstractMatrix, method::Symbol=:cholesky,
+function historical_decomposition(post::BVARPosterior, horizon::Int;
+    data::AbstractMatrix=Matrix{Float64}(undef, 0, 0), method::Symbol=:cholesky,
     quantiles::Vector{<:Real}=[0.16, 0.5, 0.84],
     check_func=nothing, narrative_check=nothing,
     transition_var::Union{Nothing,AbstractVector}=nothing,
     regime_indicator::Union{Nothing,AbstractVector{Int}}=nothing
 )
-    _validate_narrative_data(method, data)
+    use_data = isempty(data) ? post.data : data
+    isempty(use_data) && throw(ArgumentError("Data required for historical decomposition"))
+    _validate_narrative_data(method, use_data)
 
-    samples = size(chain, 1)
-    ET = eltype(data)
-    T_eff = size(data, 1) - p
+    p, n = post.p, post.n
+    samples = post.n_draws
+    ET = eltype(use_data)
+    T_eff = size(use_data, 1) - p
     horizon = min(horizon, T_eff)
-    actual = ET.(data[(p + 1):end, :])
+    actual = ET.(use_data[(p + 1):end, :])
 
     # Storage for all posterior draws
     all_contributions = zeros(ET, samples, T_eff, n, n)
     all_initial = zeros(ET, samples, T_eff, n)
     all_shocks = zeros(ET, samples, T_eff, n)
 
-    b_vecs, sigmas = extract_chain_parameters(chain)
+    b_vecs, sigmas = extract_chain_parameters(post)
 
     for s in 1:samples
-        m = parameters_to_model(b_vecs[s, :], sigmas[s, :], p, n, data)
+        m = parameters_to_model(b_vecs[s, :], sigmas[s, :], p, n, use_data)
         Q = compute_Q(m, method, horizon, check_func, narrative_check;
                       max_draws=100, transition_var=transition_var, regime_indicator=regime_indicator)
 
@@ -386,6 +387,11 @@ function historical_decomposition(chain::Chains, p::Int, n::Int, horizon::Int;
         contrib_q, contrib_m, initial_q, initial_m, shocks_m, actual, T_eff,
         default_var_names(n), default_shock_names(n), q_vec, method
     )
+end
+
+# Deprecated wrapper for old (chain, p, n, horizon) signature
+function historical_decomposition(post::BVARPosterior, p::Int, n::Int, horizon::Int; kwargs...)
+    historical_decomposition(post, horizon; kwargs...)
 end
 
 # =============================================================================

@@ -167,9 +167,9 @@ using Random
         T_eff = T_obs - p
 
         try
-            chain = estimate_bvar(Y, p; n_samples=50, sampler=:is)
+            post = estimate_bvar(Y, p; n_draws=50)
 
-            hd = historical_decomposition(chain, p, n, T_eff;
+            hd = historical_decomposition(post, T_eff;
                                           data=Y, method=:cholesky,
                                           quantiles=[0.16, 0.5, 0.84])
 

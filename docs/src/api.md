@@ -27,7 +27,7 @@ The API documentation is organized into the following pages:
 | Function | Description |
 |----------|-------------|
 | `estimate_var(Y, p)` | Estimate VAR(p) via OLS |
-| `estimate_bvar(Y, p; ...)` | Estimate Bayesian VAR with MCMC |
+| `estimate_bvar(Y, p; ...)` | Estimate Bayesian VAR (conjugate NIW) |
 | `estimate_lp(Y, shock_var, H; ...)` | Standard Local Projection |
 | `estimate_lp_iv(Y, shock_var, Z, H; ...)` | LP with instrumental variables |
 | `estimate_smooth_lp(Y, shock_var, H; ...)` | Smooth LP with B-splines |
@@ -122,8 +122,8 @@ The API documentation is organized into the following pages:
 | Function | Description |
 |----------|-------------|
 | `optimize_hyperparameters(Y, p; ...)` | Optimize Minnesota prior |
-| `posterior_mean_model(chain, p, n; ...)` | VARModel from posterior mean |
-| `posterior_median_model(chain, p, n; ...)` | VARModel from posterior median |
+| `posterior_mean_model(post; ...)` | VARModel from posterior mean |
+| `posterior_median_model(post; ...)` | VARModel from posterior median |
 | `weak_instrument_test(model; ...)` | Test for weak instruments |
 | `sargan_test(model, h)` | Overidentification test |
 | `test_regime_difference(model; ...)` | Test regime differences |
@@ -159,7 +159,7 @@ The API documentation is organized into the following pages:
 | `estimate_garch(y, p, q)` | GARCH(p,q) via MLE |
 | `estimate_egarch(y, p, q)` | EGARCH(p,q) via MLE |
 | `estimate_gjr_garch(y, p, q)` | GJR-GARCH(p,q) via MLE |
-| `estimate_sv(y; variant, ...)` | Stochastic Volatility via MCMC |
+| `estimate_sv(y; variant, ...)` | Stochastic Volatility via KSC Gibbs |
 | `forecast(vol_model, h)` | Volatility forecast with simulation CIs |
 | `arch_lm_test(y_or_model, q)` | ARCH-LM test for conditional heteroskedasticity |
 | `ljung_box_squared(z_or_model, K)` | Ljung-Box test on squared residuals |

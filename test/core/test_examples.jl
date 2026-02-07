@@ -1,7 +1,6 @@
 using MacroEconometricModels
 using Test
 using Random
-using MCMCChains
 using LinearAlgebra
 using Statistics
 using StatsAPI
@@ -34,9 +33,9 @@ using StatsAPI
         lp_irf_result = lp_irf(lp_result)
         @test lp_irf_result isa LPImpulseResponse
 
-        # Bayesian estimation (reduced samples for speed)
-        chain = estimate_bvar(Y, 2; prior=:minnesota, n_samples=50, n_adapts=20)
-        @test chain isa Chains
+        # Bayesian estimation (reduced draws for speed)
+        post = estimate_bvar(Y, 2; prior=:minnesota, n_draws=50)
+        @test post isa BVARPosterior
     end
 
     # =========================================================================
@@ -134,18 +133,17 @@ using StatsAPI
         @test best_hyper isa MinnesotaHyperparameters
         @test best_hyper.tau > 0
 
-        # BVAR estimation (reduced samples for speed)
-        chain = estimate_bvar(Y, p;
-            n_samples=50,
-            n_adapts=20,
+        # BVAR estimation (reduced draws for speed)
+        post = estimate_bvar(Y, p;
+            n_draws=50,
             prior=:minnesota,
             hyper=best_hyper
         )
-        @test chain isa Chains
+        @test post isa BVARPosterior
 
         # Bayesian IRF with Cholesky
         H = 20
-        birf_chol = irf(chain, p, n, H; method=:cholesky)
+        birf_chol = irf(post, H; method=:cholesky)
         @test birf_chol isa BayesianImpulseResponse
         @test size(birf_chol.quantiles) == (H, n, n, 3)  # 16%, 50%, 84%
     end
@@ -506,12 +504,12 @@ using StatsAPI
         best_hyper = optimize_hyperparameters(Y, p; grid_size=5)
         @test best_hyper isa MinnesotaHyperparameters
 
-        chain = estimate_bvar(Y, p; n_samples=50, n_adapts=20,
+        post = estimate_bvar(Y, p; n_draws=50,
                               prior=:minnesota, hyper=best_hyper)
-        @test chain isa Chains
+        @test post isa BVARPosterior
 
         # Bayesian IRF
-        birf = irf(chain, p, n, H; method=:cholesky)
+        birf = irf(post, H; method=:cholesky)
         @test birf isa BayesianImpulseResponse
 
         # LP comparison
