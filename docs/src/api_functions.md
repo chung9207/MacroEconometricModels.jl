@@ -209,7 +209,7 @@ Order   = [:function]
 
 ```@autodocs
 Modules = [MacroEconometricModels]
-Pages   = ["unitroot/adf.jl", "unitroot/kpss.jl", "unitroot/pp.jl", "unitroot/za.jl", "unitroot/ngperron.jl", "unitroot/johansen.jl", "unitroot/stationarity.jl", "unitroot/convenience.jl"]
+Pages   = ["teststat/adf.jl", "teststat/kpss.jl", "teststat/pp.jl", "teststat/za.jl", "teststat/ngperron.jl", "teststat/johansen.jl", "teststat/stationarity.jl", "teststat/convenience.jl"]
 Order   = [:function]
 ```
 

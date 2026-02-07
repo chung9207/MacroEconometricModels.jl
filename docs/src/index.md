@@ -242,15 +242,15 @@ The package is organized into the following modules:
 |--------|-------------|
 | `core/` | Shared infrastructure: types, utilities, display backends, covariance estimators |
 | `arima/` | ARIMA suite: types, Kalman filter, estimation (CSS/MLE), forecasting, order selection |
-| `arch/` | ARCH(q) estimation via MLE, ARCH-LM test, Ljung-Box squared, volatility forecasting |
+| `arch/` | ARCH(q) estimation via MLE, volatility forecasting |
 | `garch/` | GARCH, EGARCH, GJR-GARCH estimation via MLE, news impact curves, forecasting |
 | `sv/` | Stochastic Volatility via Bayesian MCMC (Turing.jl), posterior predictive forecasts |
 | `var/` | VAR estimation (OLS), structural identification, IRF, FEVD, historical decomposition |
 | `bvar/` | Bayesian VAR: MCMC estimation, Minnesota prior, hyperparameter optimization |
 | `lp/` | Local Projections: core, IV, smooth, state-dependent, propensity, structural LP, forecast, LP-FEVD |
 | `factor/` | Static (PCA), dynamic (two-step/EM), generalized (spectral) factor models with forecasting |
-| `nongaussian/` | Non-Gaussian structural identification: normality tests, ICA, ML, heteroskedastic-ID |
-| `unitroot/` | Unit root tests (ADF, KPSS, PP, ZA, Ng-Perron) and Johansen cointegration |
+| `nongaussian/` | Non-Gaussian structural identification: ICA, ML, heteroskedastic-ID |
+| `teststat/` | Statistical tests: unit root (ADF, KPSS, PP, ZA, Ng-Perron), Johansen cointegration, normality, ARCH diagnostics |
 | `gmm/` | Generalized Method of Moments |
 | `summary.jl` | Publication-quality summary tables and `refs()` bibliographic references |
 

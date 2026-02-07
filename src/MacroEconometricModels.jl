@@ -79,25 +79,25 @@ include("var/estimation.jl")
 include("bvar/priors.jl")
 include("bvar/estimation.jl")
 
-# Unit root tests
-include("unitroot/types.jl")
-include("unitroot/critical_values.jl")
-include("unitroot/helpers.jl")
-include("unitroot/adf.jl")
-include("unitroot/kpss.jl")
-include("unitroot/pp.jl")
-include("unitroot/za.jl")
-include("unitroot/ngperron.jl")
-include("unitroot/johansen.jl")
-include("unitroot/stationarity.jl")
-include("unitroot/convenience.jl")
-include("unitroot/show.jl")
+# Statistical tests
+include("teststat/types.jl")
+include("teststat/critical_values.jl")
+include("teststat/helpers.jl")
+include("teststat/adf.jl")
+include("teststat/kpss.jl")
+include("teststat/pp.jl")
+include("teststat/za.jl")
+include("teststat/ngperron.jl")
+include("teststat/johansen.jl")
+include("teststat/stationarity.jl")
+include("teststat/convenience.jl")
+include("teststat/show.jl")
+include("teststat/normality.jl")
 
 # Structural identification
 include("var/identification.jl")
 
 # Non-Gaussian identification
-include("nongaussian/normality.jl")
 include("nongaussian/ica.jl")
 include("nongaussian/ml.jl")
 include("nongaussian/heteroskedastic.jl")
@@ -126,7 +126,7 @@ include("arima/selection.jl")
 include("arch/types.jl")
 include("arch/estimation.jl")
 include("arch/forecast.jl")
-include("arch/diagnostics.jl")
+include("teststat/arch_diagnostics.jl")
 
 # GARCH models
 include("garch/types.jl")
