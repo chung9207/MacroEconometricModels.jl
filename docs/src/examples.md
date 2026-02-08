@@ -12,7 +12,7 @@ This chapter provides comprehensive worked examples demonstrating the main funct
 | 4 | Local Projections | `estimate_lp`, `estimate_lp_iv`, `estimate_smooth_lp` | Standard, IV, smooth, and state-dependent LP |
 | 5 | Factor Model for Large Panels | `estimate_factors`, `ic_criteria`, `forecast` | Large panel factor extraction, Bai-Ng criteria, forecasting with CIs |
 | 6 | Bayesian VAR with Minnesota Prior | `estimate_bvar`, `optimize_hyperparameters` | Minnesota prior, conjugate posterior estimation, credible intervals |
-| 7 | Non-Gaussian Structural Identification | `identify_fastica`, `normality_test_suite`, `test_shock_gaussianity` | ICA, ML, heteroskedastic identification |
+| 7 | Non-Gaussian Identification | `identify_fastica`, `normality_test_suite`, `test_shock_gaussianity` | ICA, ML, heteroskedastic identification |
 | 8 | Unit Root Testing | `adf_test`, `kpss_test`, `johansen_test` | ADF, KPSS, Zivot-Andrews, Ng-Perron, Johansen |
 | 9 | GMM Estimation | `estimate_gmm`, `j_test` | IV regression via GMM, overidentification test |
 | 10 | Complete Workflow | Multiple | Unit roots → lag selection → VAR → BVAR → LP comparison |
@@ -614,7 +614,7 @@ The FEVD shows the proportion of each variable's forecast error variance attribu
 
 ---
 
-## Example 7: Non-Gaussian Structural Identification
+## Example 7: Non-Gaussian Identification
 
 When structural shocks are non-Gaussian, statistical independence provides identification without imposing economic restrictions like recursive ordering or sign constraints. This example demonstrates the full non-Gaussian identification workflow: testing for non-Gaussianity, ICA-based and ML-based identification, and post-estimation specification tests.
 

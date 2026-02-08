@@ -56,7 +56,7 @@ A comprehensive Julia package for macroeconomic time series analysis. Provides V
 - Long-run restrictions (Blanchard & Quah 1989)
 - Arias, Rubio-Ramirez & Waggoner (2018) algorithm for zero and sign restrictions
 
-### Non-Gaussian Structural Identification
+### Non-Gaussian Identification
 - **Heteroskedasticity-based** - Markov-switching, GARCH, smooth-transition, external volatility
 - **ICA-based methods** - FastICA, JADE, SOBI, distance covariance, HSIC
 - **Non-Gaussian ML** - Student-t, mixture-normal, pseudo-ML, skew-normal
@@ -330,7 +330,7 @@ Full documentation available at [https://chung9207.github.io/MacroEconometricMod
 - Forni, Mario, Marc Hallin, Marco Lippi, and Lucrezia Reichlin. 2000. "The Generalized Dynamic-Factor Model: Identification and Estimation." *Review of Economics and Statistics* 82 (4): 540–554. [https://doi.org/10.1162/003465300559037](https://doi.org/10.1162/003465300559037)
 - Stock, James H., and Mark W. Watson. 2002. "Forecasting Using Principal Components from a Large Number of Predictors." *Journal of the American Statistical Association* 97 (460): 1167–1179. [https://doi.org/10.1198/016214502388618960](https://doi.org/10.1198/016214502388618960)
 
-### Non-Gaussian Structural Identification
+### Non-Gaussian Identification
 
 - Hyvärinen, Aapo. 1999. "Fast and Robust Fixed-Point Algorithms for Independent Component Analysis." *IEEE Transactions on Neural Networks* 10 (3): 626–634. [https://doi.org/10.1109/72.761722](https://doi.org/10.1109/72.761722)
 - Lanne, Markku, Mika Meitz, and Pentti Saikkonen. 2017. "Identification and Estimation of Non-Gaussian Structural Vector Autoregressions." *Journal of Econometrics* 196 (2): 288–304. [https://doi.org/10.1016/j.jeconom.2016.06.002](https://doi.org/10.1016/j.jeconom.2016.06.002)

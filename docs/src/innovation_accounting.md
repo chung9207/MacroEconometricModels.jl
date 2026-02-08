@@ -454,7 +454,7 @@ end
 For a comprehensive references workflow, see [Example 13: Bibliographic References](examples.md#Example-13:-Bibliographic-References).
 
 !!! note "Technical Note"
-    For non-Gaussian identification methods (ICA, ML, heteroskedasticity-based), see [Non-Gaussian Structural Identification](nongaussian.md). All 18 identification methods work seamlessly with `irf()`, `fevd()`, and `historical_decomposition()` via the `method` keyword.
+    For non-Gaussian identification methods (ICA, ML, heteroskedasticity-based), see [Non-Gaussian Identification](nongaussian.md). All 18 identification methods work seamlessly with `irf()`, `fevd()`, and `historical_decomposition()` via the `method` keyword.
 
 ---
 

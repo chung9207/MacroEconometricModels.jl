@@ -364,7 +364,7 @@ refs
 
 ---
 
-## Non-Gaussian Structural Identification
+## Non-Gaussian Identification
 
 ### Normality Tests
 
