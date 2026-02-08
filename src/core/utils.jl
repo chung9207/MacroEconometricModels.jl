@@ -62,6 +62,13 @@ macro float_fallback(func_name, arg_name)
 end
 
 # =============================================================================
+# Warning Suppression
+# =============================================================================
+
+"""Suppress all log messages (warnings, info) within `f()`. Used in bootstrap loops."""
+_suppress_warnings(f) = Base.CoreLogging.with_logger(f, Base.CoreLogging.NullLogger())
+
+# =============================================================================
 # Matrix Utilities
 # =============================================================================
 

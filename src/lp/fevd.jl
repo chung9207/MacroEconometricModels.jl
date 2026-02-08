@@ -315,12 +315,14 @@ function _lp_fevd_bootstrap(shock::Vector{T}, response::Vector{T},
 
     for b in 1:n_boot
         try
-            W_sim = _simulate_from_var(var_model, T_obs)
-            z_sim = W_sim[:, 1]
-            y_sim = W_sim[:, 2]
+            _suppress_warnings() do
+                W_sim = _simulate_from_var(var_model, T_obs)
+                z_sim = W_sim[:, 1]
+                y_sim = W_sim[:, 2]
 
-            for h in 1:H
-                boot_vals[b, h] = _scalar_lp_fevd_r2(z_sim, y_sim, h, lp_lags)
+                for h in 1:H
+                    boot_vals[b, h] = _scalar_lp_fevd_r2(z_sim, y_sim, h, lp_lags)
+                end
             end
         catch
             # Failed bootstrap draw — leave as NaN, will be filtered

@@ -66,12 +66,14 @@ function _simulate_irfs(model::VARModel{T}, method::Symbol, horizon::Int,
         Y_init = model.Y[1:p, :]
 
         Threads.@threads for r in 1:reps
-            U_boot = U[rand(1:T_eff, T_eff), :]
-            Y_boot = _simulate_var(Y_init, model.B, U_boot, T_eff + p)
-            m = estimate_var(Y_boot, p)
-            Q = compute_Q(m, method, horizon, check_func, narrative_check;
-                          transition_var=transition_var, regime_indicator=regime_indicator)
-            sim_irfs[r, :, :, :] = compute_irf(m, Q, horizon)
+            _suppress_warnings() do
+                U_boot = U[rand(1:T_eff, T_eff), :]
+                Y_boot = _simulate_var(Y_init, model.B, U_boot, T_eff + p)
+                m = estimate_var(Y_boot, p; check_stability=false)
+                Q = compute_Q(m, method, horizon, check_func, narrative_check;
+                              transition_var=transition_var, regime_indicator=regime_indicator)
+                sim_irfs[r, :, :, :] = compute_irf(m, Q, horizon)
+            end
         end
     elseif ci_type == :theoretical
         _, X = construct_var_matrices(model.Y, p)
@@ -79,11 +81,13 @@ function _simulate_irfs(model::VARModel{T}, method::Symbol, horizon::Int,
         k = ncoefs(model)
 
         Threads.@threads for r in 1:reps
-            B_star = model.B + L_V * randn(T, k, n) * L_S'
-            m = VARModel(zeros(T, 0, n), p, B_star, zeros(T, 0, n), model.Sigma, zero(T), zero(T), zero(T))
-            Q = compute_Q(m, method, horizon, check_func, narrative_check;
-                          transition_var=transition_var, regime_indicator=regime_indicator)
-            sim_irfs[r, :, :, :] = compute_irf(m, Q, horizon)
+            _suppress_warnings() do
+                B_star = model.B + L_V * randn(T, k, n) * L_S'
+                m = VARModel(zeros(T, 0, n), p, B_star, zeros(T, 0, n), model.Sigma, zero(T), zero(T), zero(T))
+                Q = compute_Q(m, method, horizon, check_func, narrative_check;
+                              transition_var=transition_var, regime_indicator=regime_indicator)
+                sim_irfs[r, :, :, :] = compute_irf(m, Q, horizon)
+            end
         end
     end
     sim_irfs

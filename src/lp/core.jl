@@ -448,19 +448,21 @@ function _structural_lp_bootstrap(Y::AbstractMatrix{T}, horizon::Int, n::Int, p:
         # Block bootstrap on Y
         Y_boot = _block_bootstrap(Y, block_size)
         try
-            var_m = estimate_var(Y_boot, p)
-            Q_r = compute_Q(var_m, method, horizon, check_func, narrative_check;
-                            max_draws=max_draws, transition_var=transition_var, regime_indicator=regime_indicator)
-            eps_r = compute_structural_shocks(var_m, Q_r)
+            _suppress_warnings() do
+                var_m = estimate_var(Y_boot, p; check_stability=false)
+                Q_r = compute_Q(var_m, method, horizon, check_func, narrative_check;
+                                max_draws=max_draws, transition_var=transition_var, regime_indicator=regime_indicator)
+                eps_r = compute_structural_shocks(var_m, Q_r)
 
-            Y_eff_r = Y_boot[(p+1):end, :]
-            for shock in 1:n
-                Y_aug = hcat(eps_r[:, shock], Y_eff_r)
-                lp_r = estimate_lp(Y_aug, 1, horizon; lags=lags,
-                                    response_vars=collect(2:(n+1)), cov_type=cov_type)
-                irf_data = extract_shock_irf(lp_r.B, lp_r.vcov, lp_r.response_vars, 2)
-                for h in 1:horizon, resp in 1:n
-                    sim_irfs[r, h, resp, shock] = irf_data.values[h+1, resp]
+                Y_eff_r = Y_boot[(p+1):end, :]
+                for shock in 1:n
+                    Y_aug = hcat(eps_r[:, shock], Y_eff_r)
+                    lp_r = estimate_lp(Y_aug, 1, horizon; lags=lags,
+                                        response_vars=collect(2:(n+1)), cov_type=cov_type)
+                    irf_data = extract_shock_irf(lp_r.B, lp_r.vcov, lp_r.response_vars, 2)
+                    for h in 1:horizon, resp in 1:n
+                        sim_irfs[r, h, resp, shock] = irf_data.values[h+1, resp]
+                    end
                 end
             end
         catch
