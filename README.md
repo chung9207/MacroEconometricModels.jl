@@ -11,29 +11,29 @@ A comprehensive Julia package for macroeconomic time series analysis. Provides V
 ## Features
 
 ### Univariate Models
-- **ARIMA** - AR, MA, ARMA, ARIMA estimation via CSS, exact MLE (Kalman filter), or CSS-MLE
-- **Automatic order selection** - `auto_arima` with grid search over (p,d,q), AIC/BIC information criteria
-- **Forecasting** - Multi-step ahead with confidence intervals via psi-weight accumulation
 - **Time Series Filters** - Trend-cycle decomposition:
   - Hodrick-Prescott filter
   - Hamilton (2018) regression filter
   - Beveridge-Nelson decomposition (ARIMA psi-weights)
   - Baxter-King band-pass filter
   - Boosted HP filter (Phillips & Shi 2021) with ADF/BIC/fixed stopping
+- **ARIMA** - AR, MA, ARMA, ARIMA estimation via CSS, exact MLE (Kalman filter), or CSS-MLE
+- **Automatic order selection** - `auto_arima` with grid search over (p,d,q), AIC/BIC information criteria
+- **Forecasting** - Multi-step ahead with confidence intervals via psi-weight accumulation
 - **ARCH** - Engle (1982) ARCH(q) with MLE, ARCH-LM test, Ljung-Box squared residuals
 - **GARCH** - GARCH(p,q), EGARCH (Nelson 1991), GJR-GARCH (Glosten, Jagannathan & Runkle 1993)
 - **Stochastic Volatility** - Bayesian SV via MCMC (basic, leverage, Student-t variants)
 - **Volatility Forecasting** - Multi-step volatility forecasts with simulation CIs
 - **Volatility Diagnostics** - News impact curves, persistence, half-life, unconditional variance
 
-### Multivariate Estimation
+### Multivariate Models
 - **Vector Autoregression (VAR)** - OLS estimation with lag order selection (AIC, BIC, HQ)
+- **Bayesian VAR (BVAR)** - Minnesota priors with hyperparameter optimization (Giannone, Lenza & Primiceri 2015)
 - **Vector Error Correction Model (VECM)** - Johansen MLE and Engle-Granger two-step estimation
   - Automatic cointegrating rank selection (trace/max-eigenvalue)
   - VAR conversion (`to_var`) enabling all 18+ identification methods
   - VECM-specific forecasting preserving cointegrating relationships
   - Granger causality: short-run, long-run, and strong tests
-- **Bayesian VAR (BVAR)** - Minnesota priors with hyperparameter optimization (Giannone, Lenza & Primiceri 2015)
 - **Local Projections (LP)** - Jorda (2005) with extensions:
   - HAC standard errors (Newey-West, White, Driscoll-Kraay)
   - Instrumental Variables (Stock & Watson 2018)
@@ -56,14 +56,6 @@ A comprehensive Julia package for macroeconomic time series analysis. Provides V
 - Long-run restrictions (Blanchard & Quah 1989)
 - Arias, Rubio-Ramirez & Waggoner (2018) algorithm for zero and sign restrictions
 
-### Non-Gaussian Identification
-- **Heteroskedasticity-based** - Markov-switching, GARCH, smooth-transition, external volatility
-- **ICA-based methods** - FastICA, JADE, SOBI, distance covariance, HSIC
-- **Non-Gaussian ML** - Student-t, mixture-normal, pseudo-ML, skew-normal
-- **Multivariate normality tests** - Jarque-Bera, Mardia, Doornik-Hansen, Henze-Zirkler
-- **Identifiability diagnostics** - Shock gaussianity, LR tests, independence tests, bootstrap strength tests
-- Seamless integration: `irf(model, 20; method=:fastica)` works out of the box
-
 ### Innovation Accounting
 - **Impulse Response Functions (IRF)** - Bootstrap, theoretical, and Bayesian credible intervals
 - **Forecast Error Variance Decomposition (FEVD)** - Frequentist and Bayesian
@@ -72,6 +64,14 @@ A comprehensive Julia package for macroeconomic time series analysis. Provides V
 - **Summary Tables** - Publication-quality output with `report()`, `table()`, `print_table()`
 - **Display Backends** - Switch between text, LaTeX, and HTML table output with `set_display_backend()`
 - **Bibliographic References** - `refs(model)` outputs AEA-style citations in text, LaTeX, BibTeX, or HTML
+
+### Non-Gaussian Identification
+- **Heteroskedasticity-based** - Markov-switching, GARCH, smooth-transition, external volatility
+- **ICA-based methods** - FastICA, JADE, SOBI, distance covariance, HSIC
+- **Non-Gaussian ML** - Student-t, mixture-normal, pseudo-ML, skew-normal
+- **Multivariate normality tests** - Jarque-Bera, Mardia, Doornik-Hansen, Henze-Zirkler
+- **Identifiability diagnostics** - Shock gaussianity, LR tests, independence tests, bootstrap strength tests
+- Seamless integration: `irf(model, 20; method=:fastica)` works out of the box
 
 ### Hypothesis Tests
 - **Unit Root Tests** - ADF, KPSS, Phillips-Perron, Zivot-Andrews, Ng-Perron
@@ -88,6 +88,70 @@ Pkg.add("MacroEconometricModels")
 ```
 
 ## Quick Start
+
+### Time Series Filters
+
+```julia
+using MacroEconometricModels
+
+y = cumsum(randn(200))  # simulate I(1) series
+
+# Hodrick-Prescott filter
+hp = hp_filter(y; lambda=1600.0)
+trend(hp)  # trend component
+cycle(hp)  # cyclical component
+
+# Hamilton (2018) regression filter
+ham = hamilton_filter(y; h=8, p=4)
+
+# Beveridge-Nelson decomposition
+bn = beveridge_nelson(y; p=:auto, q=:auto)
+
+# Baxter-King band-pass filter
+bk = baxter_king(y; pl=6, pu=32, K=12)
+
+# Boosted HP (Phillips & Shi 2021)
+bhp = boosted_hp(y; lambda=1600.0, stopping=:BIC)
+```
+
+### ARIMA Modeling
+
+```julia
+using MacroEconometricModels
+
+# Simulate AR(1) data
+y = cumsum(randn(200))
+
+# Automatic order selection
+auto = auto_arima(y; max_p=5, max_d=2, max_q=5)
+
+# Estimate ARIMA(1,1,1)
+model = estimate_arima(y, 1, 1, 1; method=:css_mle)
+
+# Forecast 12 steps ahead
+fc = forecast(model, 12)
+```
+
+### Volatility Models
+
+```julia
+using MacroEconometricModels
+
+y = randn(500)
+
+# GARCH(1,1)
+gm = estimate_garch(y, 1, 1)
+fc = forecast(gm, 10)
+
+# EGARCH (asymmetric leverage effects)
+em = estimate_egarch(y, 1, 1)
+
+# GJR-GARCH (threshold effects)
+gjr = estimate_gjr_garch(y, 1, 1)
+
+# Stochastic Volatility (Bayesian MCMC)
+sv = estimate_sv(y; variant=:basic, n_samples=1000)
+```
 
 ### VAR Analysis
 
@@ -151,47 +215,32 @@ fc = forecast(vecm, 12; ci_method=:bootstrap)
 gc = granger_causality_vecm(vecm, 1, 2)
 ```
 
-### Time Series Filters
+### Local Projections
 
 ```julia
 using MacroEconometricModels
 
-y = cumsum(randn(200))  # simulate I(1) series
-
-# Hodrick-Prescott filter
-hp = hp_filter(y; lambda=1600.0)
-trend(hp)  # trend component
-cycle(hp)  # cyclical component
-
-# Hamilton (2018) regression filter
-ham = hamilton_filter(y; h=8, p=4)
-
-# Beveridge-Nelson decomposition
-bn = beveridge_nelson(y; p=:auto, q=:auto)
-
-# Baxter-King band-pass filter
-bk = baxter_king(y; pl=6, pu=32, K=12)
-
-# Boosted HP (Phillips & Shi 2021)
-bhp = boosted_hp(y; lambda=1600.0, stopping=:BIC)
+Y = randn(200, 3)
+lp_result = estimate_lp(Y, 1, 20; cov_type=:newey_west)
 ```
 
-### ARIMA Modeling
+### Factor Model Forecasting
 
 ```julia
 using MacroEconometricModels
 
-# Simulate AR(1) data
-y = cumsum(randn(200))
+X = randn(200, 50)  # 200 observations, 50 variables
 
-# Automatic order selection
-auto = auto_arima(y; max_p=5, max_d=2, max_q=5)
+# Static factor model with PCA
+fm = estimate_factors(X, 3)
+fc = forecast(fm, 12; ci_method=:theoretical)
+fc.observables       # 12x50 forecasted observables
+fc.observables_lower # lower CI bounds
+fc.observables_upper # upper CI bounds
 
-# Estimate ARIMA(1,1,1)
-model = estimate_arima(y, 1, 1, 1; method=:css_mle)
-
-# Forecast 12 steps ahead
-fc = forecast(model, 12)
+# Dynamic factor model with bootstrap CIs
+dfm = estimate_dynamic_factors(X, 3, 2)
+fc = forecast(dfm, 12; ci_method=:bootstrap, n_boot=500)
 ```
 
 ### Non-Gaussian SVAR
@@ -250,55 +299,6 @@ g_block = granger_test(m, [1, 2], 3)
 results = granger_test_all(m)
 ```
 
-### Local Projections
-
-```julia
-using MacroEconometricModels
-
-Y = randn(200, 3)
-lp_result = estimate_lp(Y, 1, 20; cov_type=:newey_west)
-```
-
-### Factor Model Forecasting
-
-```julia
-using MacroEconometricModels
-
-X = randn(200, 50)  # 200 observations, 50 variables
-
-# Static factor model with PCA
-fm = estimate_factors(X, 3)
-fc = forecast(fm, 12; ci_method=:theoretical)
-fc.observables       # 12x50 forecasted observables
-fc.observables_lower # lower CI bounds
-fc.observables_upper # upper CI bounds
-
-# Dynamic factor model with bootstrap CIs
-dfm = estimate_dynamic_factors(X, 3, 2)
-fc = forecast(dfm, 12; ci_method=:bootstrap, n_boot=500)
-```
-
-### Volatility Models
-
-```julia
-using MacroEconometricModels
-
-y = randn(500)
-
-# GARCH(1,1)
-gm = estimate_garch(y, 1, 1)
-fc = forecast(gm, 10)
-
-# EGARCH (asymmetric leverage effects)
-em = estimate_egarch(y, 1, 1)
-
-# GJR-GARCH (threshold effects)
-gjr = estimate_gjr_garch(y, 1, 1)
-
-# Stochastic Volatility (Bayesian MCMC)
-sv = estimate_sv(y; variant=:basic, n_samples=1000)
-```
-
 ### Bibliographic References
 
 ```julia
@@ -319,6 +319,27 @@ Full documentation available at [https://chung9207.github.io/MacroEconometricMod
 
 ## References
 
+### Time Series Filters
+
+- Baxter, Marianne, and Robert G. King. 1999. "Measuring Business Cycles: Approximate Band-Pass Filters for Economic Time Series." *Review of Economics and Statistics* 81 (4): 575–593. [https://doi.org/10.1162/003465399558454](https://doi.org/10.1162/003465399558454)
+- Beveridge, Stephen, and Charles R. Nelson. 1981. "A New Approach to Decomposition of Economic Time Series into Permanent and Transitory Components with Particular Attention to Measurement of the 'Business Cycle'." *Journal of Monetary Economics* 7 (2): 151–174. [https://doi.org/10.1016/0304-3932(81)90040-4](https://doi.org/10.1016/0304-3932(81)90040-4)
+- Hamilton, James D. 2018. "Why You Should Never Use the Hodrick-Prescott Filter." *Review of Economics and Statistics* 100 (5): 831–843. [https://doi.org/10.1162/rest_a_00706](https://doi.org/10.1162/rest_a_00706)
+- Hodrick, Robert J., and Edward C. Prescott. 1997. "Postwar U.S. Business Cycles: An Empirical Investigation." *Journal of Money, Credit and Banking* 29 (1): 1–16. [https://doi.org/10.2307/2953682](https://doi.org/10.2307/2953682)
+- Phillips, Peter C. B., and Zhentao Shi. 2021. "Boosting: Why You Can Use the HP Filter." *International Economic Review* 62 (2): 521–570. [https://doi.org/10.1111/iere.12495](https://doi.org/10.1111/iere.12495)
+
+### ARIMA
+
+- Box, George E. P., and Gwilym M. Jenkins. 1970. *Time Series Analysis: Forecasting and Control*. San Francisco: Holden-Day. ISBN 978-0-8162-1094-7.
+- Hyndman, Rob J., and Yeasmin Khandakar. 2008. "Automatic Time Series Forecasting: The forecast Package for R." *Journal of Statistical Software* 27 (3): 1–22. [https://doi.org/10.18637/jss.v027.i03](https://doi.org/10.18637/jss.v027.i03)
+
+### Volatility Models
+
+- Bollerslev, Tim. 1986. "Generalized Autoregressive Conditional Heteroskedasticity." *Journal of Econometrics* 31 (3): 307–327. [https://doi.org/10.1016/0304-4076(86)90063-1](https://doi.org/10.1016/0304-4076(86)90063-1)
+- Engle, Robert F. 1982. "Autoregressive Conditional Heteroscedasticity with Estimates of the Variance of United Kingdom Inflation." *Econometrica* 50 (4): 987–1007. [https://doi.org/10.2307/1912773](https://doi.org/10.2307/1912773)
+- Glosten, Lawrence R., Ravi Jagannathan, and David E. Runkle. 1993. "On the Relation Between the Expected Value and the Volatility of the Nominal Excess Return on Stocks." *Journal of Finance* 48 (5): 1779–1801. [https://doi.org/10.1111/j.1540-6261.1993.tb05128.x](https://doi.org/10.1111/j.1540-6261.1993.tb05128.x)
+- Nelson, Daniel B. 1991. "Conditional Heteroskedasticity in Asset Returns: A New Approach." *Econometrica* 59 (2): 347–370. [https://doi.org/10.2307/2938260](https://doi.org/10.2307/2938260)
+- Taylor, Stephen J. 1986. *Modelling Financial Time Series*. Chichester: Wiley. ISBN 978-0-471-90993-4.
+
 ### VAR and Structural Identification
 
 - Arias, Jonas E., Juan F. Rubio-Ramírez, and Daniel F. Waggoner. 2018. "Inference Based on Structural Vector Autoregressions Identified with Sign and Zero Restrictions: Theory and Applications." *Econometrica* 86 (2): 685–720. [https://doi.org/10.3982/ECTA14468](https://doi.org/10.3982/ECTA14468)
@@ -335,6 +356,11 @@ Full documentation available at [https://chung9207.github.io/MacroEconometricMod
 - Giannone, Domenico, Michele Lenza, and Giorgio E. Primiceri. 2015. "Prior Selection for Vector Autoregressions." *Review of Economics and Statistics* 97 (2): 436–451. [https://doi.org/10.1162/REST_a_00483](https://doi.org/10.1162/REST_a_00483)
 - Litterman, Robert B. 1986. "Forecasting with Bayesian Vector Autoregressions—Five Years of Experience." *Journal of Business & Economic Statistics* 4 (1): 25–38. [https://doi.org/10.1080/07350015.1986.10509491](https://doi.org/10.1080/07350015.1986.10509491)
 
+### VECM and Cointegration
+
+- Engle, Robert F., and Clive W. J. Granger. 1987. "Co-Integration and Error Correction: Representation, Estimation, and Testing." *Econometrica* 55 (2): 251–276. [https://doi.org/10.2307/1913236](https://doi.org/10.2307/1913236)
+- Johansen, Søren. 1991. "Estimation and Hypothesis Testing of Cointegration Vectors in Gaussian Vector Autoregressive Models." *Econometrica* 59 (6): 1551–1580. [https://doi.org/10.2307/2938278](https://doi.org/10.2307/2938278)
+
 ### Local Projections
 
 - Angrist, Joshua D., Òscar Jordà, and Guido M. Kuersteiner. 2018. "Semiparametric Estimates of Monetary Policy Effects: String Theory Revisited." *Journal of Business & Economic Statistics* 36 (3): 371–387. [https://doi.org/10.1080/07350015.2016.1204919](https://doi.org/10.1080/07350015.2016.1204919)
@@ -349,25 +375,17 @@ Full documentation available at [https://chung9207.github.io/MacroEconometricMod
 - Forni, Mario, Marc Hallin, Marco Lippi, and Lucrezia Reichlin. 2000. "The Generalized Dynamic-Factor Model: Identification and Estimation." *Review of Economics and Statistics* 82 (4): 540–554. [https://doi.org/10.1162/003465300559037](https://doi.org/10.1162/003465300559037)
 - Stock, James H., and Mark W. Watson. 2002. "Forecasting Using Principal Components from a Large Number of Predictors." *Journal of the American Statistical Association* 97 (460): 1167–1179. [https://doi.org/10.1198/016214502388618960](https://doi.org/10.1198/016214502388618960)
 
+### GMM and Covariance Estimation
+
+- Hansen, Lars Peter. 1982. "Large Sample Properties of Generalized Method of Moments Estimators." *Econometrica* 50 (4): 1029–1054. [https://doi.org/10.2307/1912775](https://doi.org/10.2307/1912775)
+- Newey, Whitney K., and Kenneth D. West. 1987. "A Simple, Positive Semi-Definite, Heteroskedasticity and Autocorrelation Consistent Covariance Matrix." *Econometrica* 55 (3): 703–708. [https://doi.org/10.2307/1913610](https://doi.org/10.2307/1913610)
+
 ### Non-Gaussian Identification
 
 - Hyvärinen, Aapo. 1999. "Fast and Robust Fixed-Point Algorithms for Independent Component Analysis." *IEEE Transactions on Neural Networks* 10 (3): 626–634. [https://doi.org/10.1109/72.761722](https://doi.org/10.1109/72.761722)
 - Lanne, Markku, Mika Meitz, and Pentti Saikkonen. 2017. "Identification and Estimation of Non-Gaussian Structural Vector Autoregressions." *Journal of Econometrics* 196 (2): 288–304. [https://doi.org/10.1016/j.jeconom.2016.06.002](https://doi.org/10.1016/j.jeconom.2016.06.002)
 - Lanne, Markku, and Helmut Lütkepohl. 2010. "Structural Vector Autoregressions with Nonnormal Residuals." *Journal of Business & Economic Statistics* 28 (1): 159–168. [https://doi.org/10.1198/jbes.2009.06003](https://doi.org/10.1198/jbes.2009.06003)
 - Rigobon, Roberto. 2003. "Identification through Heteroskedasticity." *Review of Economics and Statistics* 85 (4): 777–792. [https://doi.org/10.1162/003465303772815727](https://doi.org/10.1162/003465303772815727)
-
-### VECM and Cointegration
-
-- Engle, Robert F., and Clive W. J. Granger. 1987. "Co-Integration and Error Correction: Representation, Estimation, and Testing." *Econometrica* 55 (2): 251–276. [https://doi.org/10.2307/1913236](https://doi.org/10.2307/1913236)
-- Johansen, Søren. 1991. "Estimation and Hypothesis Testing of Cointegration Vectors in Gaussian Vector Autoregressive Models." *Econometrica* 59 (6): 1551–1580. [https://doi.org/10.2307/2938278](https://doi.org/10.2307/2938278)
-
-### Time Series Filters
-
-- Baxter, Marianne, and Robert G. King. 1999. "Measuring Business Cycles: Approximate Band-Pass Filters for Economic Time Series." *Review of Economics and Statistics* 81 (4): 575–593. [https://doi.org/10.1162/003465399558454](https://doi.org/10.1162/003465399558454)
-- Beveridge, Stephen, and Charles R. Nelson. 1981. "A New Approach to Decomposition of Economic Time Series into Permanent and Transitory Components with Particular Attention to Measurement of the 'Business Cycle'." *Journal of Monetary Economics* 7 (2): 151–174. [https://doi.org/10.1016/0304-3932(81)90040-4](https://doi.org/10.1016/0304-3932(81)90040-4)
-- Hamilton, James D. 2018. "Why You Should Never Use the Hodrick-Prescott Filter." *Review of Economics and Statistics* 100 (5): 831–843. [https://doi.org/10.1162/rest_a_00706](https://doi.org/10.1162/rest_a_00706)
-- Hodrick, Robert J., and Edward C. Prescott. 1997. "Postwar U.S. Business Cycles: An Empirical Investigation." *Journal of Money, Credit and Banking* 29 (1): 1–16. [https://doi.org/10.2307/2953682](https://doi.org/10.2307/2953682)
-- Phillips, Peter C. B., and Zhentao Shi. 2021. "Boosting: Why You Can Use the HP Filter." *International Economic Review* 62 (2): 521–570. [https://doi.org/10.1111/iere.12495](https://doi.org/10.1111/iere.12495)
 
 ### Unit Root and Cointegration Tests
 
@@ -386,24 +404,6 @@ Full documentation available at [https://chung9207.github.io/MacroEconometricMod
 - Rao, C. Radhakrishna. 1948. "Large Sample Tests of Statistical Hypotheses Concerning Several Parameters with Applications to Problems of Estimation." *Mathematical Proceedings of the Cambridge Philosophical Society* 44 (1): 50–57. [https://doi.org/10.1017/S0305004100023987](https://doi.org/10.1017/S0305004100023987)
 - Silvey, S. D. 1959. "The Lagrangian Multiplier Test." *Annals of Mathematical Statistics* 30 (2): 389–407. [https://doi.org/10.1214/aoms/1177706259](https://doi.org/10.1214/aoms/1177706259)
 - Wilks, Samuel S. 1938. "The Large-Sample Distribution of the Likelihood Ratio for Testing Composite Hypotheses." *Annals of Mathematical Statistics* 9 (1): 60–62. [https://doi.org/10.1214/aoms/1177732360](https://doi.org/10.1214/aoms/1177732360)
-
-### ARIMA
-
-- Box, George E. P., and Gwilym M. Jenkins. 1970. *Time Series Analysis: Forecasting and Control*. San Francisco: Holden-Day. ISBN 978-0-8162-1094-7.
-- Hyndman, Rob J., and Yeasmin Khandakar. 2008. "Automatic Time Series Forecasting: The forecast Package for R." *Journal of Statistical Software* 27 (3): 1–22. [https://doi.org/10.18637/jss.v027.i03](https://doi.org/10.18637/jss.v027.i03)
-
-### Volatility Models
-
-- Bollerslev, Tim. 1986. "Generalized Autoregressive Conditional Heteroskedasticity." *Journal of Econometrics* 31 (3): 307–327. [https://doi.org/10.1016/0304-4076(86)90063-1](https://doi.org/10.1016/0304-4076(86)90063-1)
-- Engle, Robert F. 1982. "Autoregressive Conditional Heteroscedasticity with Estimates of the Variance of United Kingdom Inflation." *Econometrica* 50 (4): 987–1007. [https://doi.org/10.2307/1912773](https://doi.org/10.2307/1912773)
-- Glosten, Lawrence R., Ravi Jagannathan, and David E. Runkle. 1993. "On the Relation Between the Expected Value and the Volatility of the Nominal Excess Return on Stocks." *Journal of Finance* 48 (5): 1779–1801. [https://doi.org/10.1111/j.1540-6261.1993.tb05128.x](https://doi.org/10.1111/j.1540-6261.1993.tb05128.x)
-- Nelson, Daniel B. 1991. "Conditional Heteroskedasticity in Asset Returns: A New Approach." *Econometrica* 59 (2): 347–370. [https://doi.org/10.2307/2938260](https://doi.org/10.2307/2938260)
-- Taylor, Stephen J. 1986. *Modelling Financial Time Series*. Chichester: Wiley. ISBN 978-0-471-90993-4.
-
-### GMM and Covariance Estimation
-
-- Hansen, Lars Peter. 1982. "Large Sample Properties of Generalized Method of Moments Estimators." *Econometrica* 50 (4): 1029–1054. [https://doi.org/10.2307/1912775](https://doi.org/10.2307/1912775)
-- Newey, Whitney K., and Kenneth D. West. 1987. "A Simple, Positive Semi-Definite, Heteroskedasticity and Autocorrelation Consistent Covariance Matrix." *Econometrica* 55 (3): 703–708. [https://doi.org/10.2307/1913610](https://doi.org/10.2307/1913610)
 
 ## License
 
