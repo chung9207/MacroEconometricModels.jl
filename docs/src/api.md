@@ -20,6 +20,7 @@ The API documentation is organized into the following pages:
 | `validate_for_model(d, :var)` | Check dimensionality for model type |
 | `apply_tcode(y, tcode)` | FRED transformation codes 1--7 |
 | `inverse_tcode(y, tcode; x_prev)` | Undo FRED transformation |
+| `apply_filter(d, :hp; component=:cycle)` | Apply time series filters per-variable |
 | `describe_data(d)` | Per-variable summary statistics |
 | `xtset(df, group_col, time_col)` | Stata-style panel construction |
 | `group_data(pd, g)` | Extract single entity from panel |
@@ -69,6 +70,8 @@ The API documentation is organized into the following pages:
 | `estimate_factors(X, r; ...)` | Static factor model via PCA |
 | `estimate_dynamic_factors(X, r, p; ...)` | Dynamic factor model |
 | `estimate_gdfm(X, q; ...)` | Generalized dynamic factor model |
+| `estimate_pvar(pd, p; ...)` | Panel VAR via GMM (FD or System) |
+| `estimate_pvar_feols(pd, p; ...)` | Panel VAR via Fixed-Effects OLS |
 | `estimate_gmm(moment_fn, theta0, data; ...)` | GMM estimation |
 | `structural_lp(Y, H; method=:cholesky, ...)` | Structural LP with multi-shock IRFs |
 | `estimate_vecm(Y, p; rank=:auto, ...)` | Estimate VECM via Johansen MLE or Engle-Granger |
@@ -102,6 +105,11 @@ The API documentation is organized into the following pages:
 | `identify_garch(model; ...)` | GARCH SVAR identification |
 | `identify_smooth_transition(model, s; ...)` | Smooth-transition SVAR identification |
 | `identify_external_volatility(model, regime)` | External volatility SVAR identification |
+| `pvar_oirf(model, H)` | Panel VAR orthogonalized IRF (Cholesky) |
+| `pvar_girf(model, H)` | Panel VAR generalized IRF (Pesaran & Shin 1998) |
+| `pvar_fevd(model, H)` | Panel VAR forecast error variance decomposition |
+| `pvar_stability(model)` | Panel VAR eigenvalue stability check |
+| `pvar_bootstrap_irf(model, H; ...)` | Panel VAR bootstrap IRF confidence intervals |
 | `lp_fevd(slp, H; method=:r2, ...)` | LP-FEVD (Gorodnichenko & Lee 2019) |
 | `cumulative_irf(lp_irfs)` | Cumulative IRF from LP impulse response |
 | `historical_decomposition(slp)` | Historical decomposition from structural LP |
@@ -186,6 +194,9 @@ The API documentation is organized into the following pages:
 | `sargan_test(model, h)` | Overidentification test |
 | `test_regime_difference(model; ...)` | Test regime differences |
 | `propensity_diagnostics(model)` | Propensity score diagnostics |
+| `pvar_hansen_j(model)` | Hansen J-test for Panel VAR |
+| `pvar_mmsc(model)` | Andrews-Lu MMSC for Panel VAR |
+| `pvar_lag_selection(pd, max_p; ...)` | Panel VAR lag order selection |
 | `j_test(model)` | Hansen J-test for GMM |
 | `gmm_summary(model)` | Summary statistics for GMM |
 

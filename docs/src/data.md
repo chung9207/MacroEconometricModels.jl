@@ -7,6 +7,7 @@ Applied macroeconometric research begins with data. This module provides typed d
 | **Containers** | `TimeSeriesData`, `PanelData`, `CrossSectionData` | Typed wrappers with metadata |
 | **Validation** | `diagnose`, `fix` | Detect and repair NaN, Inf, constant columns |
 | **Transforms** | `apply_tcode`, `inverse_tcode` | FRED transformation codes 1--7 |
+| **Filtering** | `apply_filter` | Apply HP/Hamilton/BN/BK/Boosted HP per-variable |
 | **Panel** | `xtset`, `group_data` | Stata-style panel setup and slicing |
 | **Summary** | `describe_data` | Per-variable descriptive statistics |
 | **Dispatch** | `estimate_var(d, p)` | All estimators accept `TimeSeriesData` directly |
@@ -450,6 +451,93 @@ Each loaded dataset carries bibliographic references accessible via `refs()`, su
 refs(md; format=:bibtex)   # BibTeX entry for McCracken & Ng (2016)
 refs(:fred_md)             # same via symbol dispatch
 ```
+
+---
+
+## Filtering
+
+`apply_filter()` applies time series filters (HP, Hamilton, BN, BK, Boosted HP) to variables in a `TimeSeriesData` or `PanelData`, extracting trend or cycle components. When filters produce different-length outputs (e.g., Hamilton drops initial observations), the result is trimmed to the common valid range.
+
+### Basic Usage
+
+```julia
+d = TimeSeriesData(cumsum(randn(200, 3), dims=1);
+    varnames=["GDP", "CPI", "FFR"])
+
+# HP cycle for all variables
+d_hp = apply_filter(d, :hp; component=:cycle)
+
+# HP trend for all variables
+d_trend = apply_filter(d, :hp; component=:trend)
+
+# Hamilton filter (output is shorter — drops initial observations)
+d_ham = apply_filter(d, :hamilton; component=:cycle)
+```
+
+Available filter symbols: `:hp`, `:hamilton`, `:bn`, `:bk`, `:boosted_hp`.
+
+### Per-Variable Specifications
+
+```julia
+# Different filters per variable (nothing = pass-through)
+d2 = apply_filter(d, [:hp, :hamilton, nothing]; component=:cycle)
+
+# Per-variable component overrides via tuples
+d3 = apply_filter(d, [(:hp, :trend), (:hamilton, :cycle), nothing])
+```
+
+### Selective Filtering
+
+```julia
+# Filter only selected variables (others pass through unchanged)
+d_sel = apply_filter(d, :hp; vars=["GDP", "CPI"], component=:cycle)
+d_sel = apply_filter(d, :hp; vars=[1, 2], component=:cycle)  # by index
+```
+
+### Pre-Computed Results
+
+```julia
+# Use a pre-computed filter result
+r = hp_filter(d[:, "GDP"]; lambda=100.0)
+d2 = apply_filter(d, [r, :hp, nothing]; component=:cycle)
+```
+
+### Forwarding Filter Parameters
+
+Additional keyword arguments are forwarded to the filter functions:
+
+```julia
+# Custom HP lambda
+d_smooth = apply_filter(d, :hp; component=:cycle, lambda=100.0)
+
+# Custom Hamilton horizon and lags
+d_ham = apply_filter(d, :hamilton; component=:cycle, h=24, p=12)
+```
+
+### Panel Data
+
+`apply_filter` applies filters group-by-group to `PanelData`, reassembling the results:
+
+```julia
+using DataFrames
+
+df = DataFrame(
+    country = repeat(["US", "UK", "JP"], inner=100),
+    quarter = repeat(1:100, 3),
+    gdp = cumsum(randn(300)),
+    cpi = cumsum(randn(300))
+)
+pd = xtset(df, :country, :quarter)
+
+# HP cycle for all variables, applied per-group
+pd_hp = apply_filter(pd, :hp; component=:cycle)
+
+# Filter only GDP, pass through CPI
+pd_sel = apply_filter(pd, :hp; vars=["gdp"], component=:cycle)
+```
+
+!!! note "Technical Note"
+    Filters that produce shorter output (Hamilton, Baxter-King) trim each group independently. If groups have different lengths, the resulting panel may become unbalanced.
 
 ---
 

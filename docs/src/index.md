@@ -19,6 +19,7 @@
 - **VAR**: OLS estimation with lag order selection (AIC, BIC, HQ), stability diagnostics, companion matrix
 - **Bayesian VAR**: Conjugate Normal-Inverse-Wishart posterior with Minnesota prior; direct and Gibbs samplers; automatic hyperparameter optimization via marginal likelihood (Giannone, Lenza & Primiceri 2015)
 - **VECM**: Johansen MLE and Engle-Granger two-step estimation for cointegrated systems; automatic rank selection; IRF/FEVD/HD via VAR conversion (`to_var`); VECM-specific forecasting; Granger causality (short-run, long-run, strong)
+- **Panel VAR**: GMM estimation via Arellano-Bond (1991) first-difference and Blundell-Bond (1998) system GMM; fixed-effects OLS; Windmeijer (2005) corrected standard errors; Hansen J-test, Andrews-Lu MMSC; OIRF, GIRF, FEVD; group-level bootstrap CIs; lag selection
 - **Local Projections**: Jorda (2005) with extensions for IV (Stock & Watson 2018), smooth LP (Barnichon & Brownlees 2019), state-dependence (Auerbach & Gorodnichenko 2013), propensity score weighting (Angrist et al. 2018), structural LP (Plagborg-Moller & Wolf 2021), LP forecasting, and LP-FEVD (Gorodnichenko & Lee 2019)
 - **Factor Models**: Static (PCA), dynamic (two-step/EM), and generalized dynamic (spectral GDFM) with Bai-Ng information criteria; unified forecasting with theoretical and bootstrap CIs
 - **GMM**: Flexible estimation with one-step, two-step, and iterated weighting; Hansen J-test
@@ -278,6 +279,7 @@ The package is organized into the following modules:
 | `factor/` | Static (PCA), dynamic (two-step/EM), generalized (spectral) factor models with forecasting |
 | `nongaussian/` | Non-Gaussian structural identification: ICA, ML, heteroskedastic-ID |
 | `teststat/` | Statistical tests: unit root, Johansen, normality, Granger causality, LR/LM, ARCH diagnostics |
+| `pvar/` | Panel VAR: types, transforms, instruments, estimation (GMM/FE-OLS), analysis, bootstrap, tests |
 | `gmm/` | Generalized Method of Moments |
 | `summary.jl` | Publication-quality summary tables and `refs()` bibliographic references |
 
@@ -359,6 +361,14 @@ Throughout this documentation, we use the following notation conventions:
 - Forni, Mario, Marc Hallin, Marco Lippi, and Lucrezia Reichlin. 2000. "The Generalized Dynamic-Factor Model: Identification and Estimation." *Review of Economics and Statistics* 82 (4): 540--554. [https://doi.org/10.1162/003465300559037](https://doi.org/10.1162/003465300559037)
 - Stock, James H., and Mark W. Watson. 2002. "Forecasting Using Principal Components from a Large Number of Predictors." *Journal of the American Statistical Association* 97 (460): 1167--1179. [https://doi.org/10.1198/016214502388618960](https://doi.org/10.1198/016214502388618960)
 
+### Panel VAR
+
+- Holtz-Eakin, Douglas, Whitney Newey, and Harvey S. Rosen. 1988. "Estimating Vector Autoregressions with Panel Data." *Econometrica* 56 (6): 1371--1395. [https://doi.org/10.2307/1913103](https://doi.org/10.2307/1913103)
+- Arellano, Manuel, and Stephen Bond. 1991. "Some Tests of Specification for Panel Data." *Review of Economic Studies* 58 (2): 277--297. [https://doi.org/10.2307/2297968](https://doi.org/10.2307/2297968)
+- Blundell, Richard, and Stephen Bond. 1998. "Initial Conditions and Moment Restrictions in Dynamic Panel Data Models." *Journal of Econometrics* 87 (1): 115--143. [https://doi.org/10.1016/S0304-4076(98)00009-8](https://doi.org/10.1016/S0304-4076(98)00009-8)
+- Windmeijer, Frank. 2005. "A Finite Sample Correction for the Variance of Linear Efficient Two-Step GMM Estimators." *Journal of Econometrics* 126 (1): 25--51. [https://doi.org/10.1016/j.jeconom.2004.02.005](https://doi.org/10.1016/j.jeconom.2004.02.005)
+- Andrews, Donald W. K., and Biao Lu. 2001. "Consistent Model and Moment Selection Procedures for GMM Estimation." *Journal of Econometrics* 101 (1): 123--164. [https://doi.org/10.1016/S0304-4076(00)00077-4](https://doi.org/10.1016/S0304-4076(00)00077-4)
+
 ### Robust Inference
 
 - Andrews, Donald W. K. 1991. "Heteroskedasticity and Autocorrelation Consistent Covariance Matrix Estimation." *Econometrica* 59 (3): 817--858. [https://doi.org/10.2307/2938229](https://doi.org/10.2307/2938229)
@@ -390,6 +400,6 @@ Contributions are welcome! Please see the [GitHub repository](https://github.com
 ## Contents
 
 ```@contents
-Pages = ["data.md", "filters.md", "arima.md", "volatility.md", "manual.md", "bayesian.md", "vecm.md", "lp.md", "factormodels.md", "innovation_accounting.md", "nongaussian.md", "hypothesis_tests.md", "examples.md", "api.md", "api_types.md", "api_functions.md"]
+Pages = ["data.md", "filters.md", "arima.md", "volatility.md", "manual.md", "bayesian.md", "vecm.md", "pvar.md", "lp.md", "factormodels.md", "innovation_accounting.md", "nongaussian.md", "hypothesis_tests.md", "examples.md", "api.md", "api_types.md", "api_functions.md"]
 Depth = 2
 ```

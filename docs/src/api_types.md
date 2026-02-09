@@ -125,6 +125,16 @@ Order   = [:type]
 
 ---
 
+## Panel VAR Types
+
+```@docs
+PVARModel
+PVARStability
+PVARTestResult
+```
+
+---
+
 ## GMM Types
 
 ```@docs
@@ -262,6 +272,10 @@ AbstractVARModel
 
 VECMForecast{T}
 VECMGrangerResult{T}
+
+PVARModel{T} <: StatsAPI.RegressionModel
+PVARStability{T}
+PVARTestResult{T} <: StatsAPI.HypothesisTest
 
 AbstractAnalysisResult
 ├── AbstractFrequentistResult

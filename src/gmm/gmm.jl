@@ -656,3 +656,91 @@ function estimate_lp_gmm(Y::AbstractMatrix{T}, shock_var::Int, horizon::Int;
 
     models
 end
+
+# =============================================================================
+# Linear GMM Utilities (for Panel VAR and other linear IV models)
+# =============================================================================
+
+"""
+    linear_gmm_solve(S_ZX::Matrix{T}, S_Zy::AbstractVecOrMat{T},
+                      W::Matrix{T}) -> Vector{T}
+
+Solve linear GMM analytically: E[Z'(y - Xβ)] = 0.
+
+Given pre-aggregated cross-products S_ZX = Σ_i Z_i'X_i and S_Zy = Σ_i Z_i'y_i:
+
+    β = (S_ZX' W S_ZX)⁻¹ S_ZX' W S_Zy
+
+# Arguments
+- `S_ZX` — q × k aggregated instrument-regressor cross-product
+- `S_Zy` — q × 1 (or q-vector) aggregated instrument-response cross-product
+- `W` — q × q weighting matrix
+
+# Returns
+- Parameter vector β (length k)
+"""
+function linear_gmm_solve(S_ZX::Matrix{T}, S_Zy::AbstractVecOrMat{T},
+                           W::Matrix{T}) where {T<:AbstractFloat}
+    bread = S_ZX' * W * S_ZX
+    rhs = S_ZX' * W * (S_Zy isa AbstractVector ? S_Zy : vec(S_Zy))
+    robust_inv(bread) * rhs
+end
+
+"""
+    gmm_sandwich_vcov(S_ZX::Matrix{T}, W::Matrix{T},
+                       D_e::Matrix{T}) -> Matrix{T}
+
+Robust sandwich covariance for one-step GMM:
+
+    V = (S_ZX' W S_ZX)⁻¹ S_ZX' W D_e W S_ZX (S_ZX' W S_ZX)⁻¹
+
+where D_e = Σ_i (Z_i e_i)(Z_i e_i)' is the robust moment covariance.
+
+# Arguments
+- `S_ZX` — q × k aggregated instrument-regressor cross-product
+- `W` — q × q weighting matrix
+- `D_e` — q × q robust moment covariance
+
+# Returns
+- k × k covariance matrix
+"""
+function gmm_sandwich_vcov(S_ZX::Matrix{T}, W::Matrix{T},
+                            D_e::Matrix{T}) where {T<:AbstractFloat}
+    bread_inv = robust_inv(S_ZX' * W * S_ZX)
+    bread_inv * (S_ZX' * W * D_e * W * S_ZX) * bread_inv
+end
+
+"""
+    andrews_lu_mmsc(j_stat::T, n_instruments::Int, n_params::Int,
+                     n_obs::Int; hq_criterion::Real=2.1) -> NamedTuple
+
+Andrews-Lu (2001) Model and Moment Selection Criteria based on Hansen J-statistic.
+
+    MMSC_BIC  = J - (c - b) × log(n)
+    MMSC_AIC  = J - (c - b) × 2
+    MMSC_HQIC = J - Q(c - b) × log(log(n))
+
+where c = moment conditions, b = parameters, n = observations.
+Lower values indicate better model specification.
+
+# Arguments
+- `j_stat` — Hansen J-test statistic
+- `n_instruments` — number of moment conditions (c)
+- `n_params` — number of parameters (b)
+- `n_obs` — number of observations (n)
+- `hq_criterion` — penalty parameter Q for HQIC (default 2.1)
+
+# Returns
+NamedTuple `(bic, aic, hqic)`.
+
+# References
+- Andrews, D. & Lu, B. (2001). Journal of Econometrics 101(1), 123-164.
+"""
+function andrews_lu_mmsc(j_stat::T, n_instruments::Int, n_params::Int,
+                          n_obs::Int; hq_criterion::Real=2.1) where {T<:AbstractFloat}
+    excess = n_instruments - n_params
+    bic  = j_stat - T(excess) * log(T(n_obs))
+    aic  = j_stat - T(excess) * T(2)
+    hqic = j_stat - T(hq_criterion) * T(excess) * log(log(T(n_obs)))
+    (bic=bic, aic=aic, hqic=hqic)
+end

@@ -16,7 +16,7 @@ const TEST_GROUPS = [
         "bvar/test_bgr.jl",
         "core/test_coverage_gaps.jl",
     ]),
-    # Group 2: IRF, FEVD, HD, StatsAPI, VECM
+    # Group 2: IRF, FEVD, HD, StatsAPI, VECM, PVAR
     ("IRF & FEVD" => [
         "var/test_irf.jl",
         "var/test_irf_ci.jl",
@@ -25,6 +25,7 @@ const TEST_GROUPS = [
         "var/test_hd.jl",
         "core/test_summary.jl",
         "vecm/test_vecm.jl",
+        "pvar/test_pvar.jl",
     ]),
     # Group 3: Factor models
     ("Factor Models" => [
@@ -286,6 +287,10 @@ else
 
         @testset "Data Module" begin
             include("data/test_data.jl")
+        end
+
+        @testset "Panel VAR" begin
+            include("pvar/test_pvar.jl")
         end
     end
 end

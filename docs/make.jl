@@ -13,7 +13,7 @@ makedocs(;
         canonical="https://chung9207.github.io/MacroEconometricModels.jl",
         edit_link="main",
         assets=String[],
-        size_threshold=450 * 1024,
+        size_threshold=500 * 1024,
         mathengine=Documenter.MathJax3(),
         repolink="https://github.com/chung9207/MacroEconometricModels.jl",
     ),
@@ -31,6 +31,9 @@ makedocs(;
             "VECM" => "vecm.md",
             "Local Projections" => "lp.md",
             "Factor Models" => "factormodels.md",
+        ],
+        "Panel Models" => [
+            "Panel VAR" => "pvar.md",
         ],
         "Innovation Accounting" => "innovation_accounting.md",
         "Non-Gaussian Identification" => "nongaussian.md",
