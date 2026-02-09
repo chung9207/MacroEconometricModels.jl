@@ -1900,6 +1900,42 @@ const _REFERENCES = Dict{Symbol, _RefEntry}(
         title="Investigating Causal Relations by Econometric Models and Cross-spectral Methods",
         journal="Econometrica", volume="37", issue="3", pages="424--438",
         doi="10.2307/1912791", isbn="", publisher="", entry_type=:article),
+    # --- Panel VAR ---
+    :holtz_eakin1988 => (key=:holtz_eakin1988,
+        authors="Holtz-Eakin, Douglas and Newey, Whitney and Rosen, Harvey S.",
+        year=1988, title="Estimating Vector Autoregressions with Panel Data",
+        journal="Econometrica", volume="56", issue="6", pages="1371--1395",
+        doi="10.2307/1913103", isbn="", publisher="", entry_type=:article),
+    :arellano_bond1991 => (key=:arellano_bond1991,
+        authors="Arellano, Manuel and Bond, Stephen", year=1991,
+        title="Some Tests of Specification for Panel Data: Monte Carlo Evidence and an Application to Employment Equations",
+        journal="Review of Economic Studies", volume="58", issue="2", pages="277--297",
+        doi="10.2307/2297968", isbn="", publisher="", entry_type=:article),
+    :blundell_bond1998 => (key=:blundell_bond1998,
+        authors="Blundell, Richard and Bond, Stephen", year=1998,
+        title="Initial Conditions and Moment Restrictions in Dynamic Panel Data Models",
+        journal="Journal of Econometrics", volume="87", issue="1", pages="115--143",
+        doi="10.1016/S0304-4076(98)00009-8", isbn="", publisher="", entry_type=:article),
+    :windmeijer2005 => (key=:windmeijer2005,
+        authors="Windmeijer, Frank", year=2005,
+        title="A Finite Sample Correction for the Variance of Linear Efficient Two-Step GMM Estimators",
+        journal="Journal of Econometrics", volume="126", issue="1", pages="25--51",
+        doi="10.1016/j.jeconom.2004.02.005", isbn="", publisher="", entry_type=:article),
+    :andrews_lu2001 => (key=:andrews_lu2001,
+        authors="Andrews, Donald W. K. and Lu, Biao", year=2001,
+        title="Consistent Model and Moment Selection Procedures for GMM Estimation with Application to Dynamic Panel Data Models",
+        journal="Journal of Econometrics", volume="101", issue="1", pages="123--164",
+        doi="10.1016/S0304-4076(00)00077-4", isbn="", publisher="", entry_type=:article),
+    :pesaran_shin1998 => (key=:pesaran_shin1998,
+        authors="Pesaran, M. Hashem and Shin, Yongcheol", year=1998,
+        title="Generalized Impulse Response Analysis in Linear Multivariate Models",
+        journal="Economics Letters", volume="58", issue="1", pages="17--29",
+        doi="10.1016/S0165-1765(97)00214-0", isbn="", publisher="", entry_type=:article),
+    :binder_hsiao_pesaran2005 => (key=:binder_hsiao_pesaran2005,
+        authors="Binder, Michael and Hsiao, Cheng and Pesaran, M. Hashem", year=2005,
+        title="Estimation and Inference in Short Panel Vector Autoregressions with Unit Roots and Cointegration",
+        journal="Econometric Theory", volume="21", issue="4", pages="795--837",
+        doi="10.1017/S0266466605050413", isbn="", publisher="", entry_type=:article),
     # --- Data Sources ---
     :mccracken_ng2016 => (key=:mccracken_ng2016,
         authors="McCracken, Michael W. and Ng, Serena", year=2016,
@@ -2048,6 +2084,16 @@ const _TYPE_REFS = Dict{Symbol, Vector{Symbol}}(
     :GrangerCausalityResult => [:granger1969, :lutkepohl2005],
     :granger => [:granger1969, :lutkepohl2005],
     :granger_test => [:granger1969, :lutkepohl2005],
+    # Panel VAR
+    :PVARModel => [:holtz_eakin1988, :arellano_bond1991, :blundell_bond1998],
+    :PVARStability => [:holtz_eakin1988],
+    :PVARTestResult => [:hansen1982],
+    :pvar => [:holtz_eakin1988, :arellano_bond1991, :blundell_bond1998],
+    :fd_gmm => [:arellano_bond1991],
+    :system_gmm => [:blundell_bond1998],
+    :windmeijer => [:windmeijer2005],
+    :andrews_lu => [:andrews_lu2001],
+    :girf => [:pesaran_shin1998],
     # Data sources (symbol dispatch)
     :fred_md => [:mccracken_ng2016],
     :fred_qd => [:mccracken_ng2020],
@@ -2337,6 +2383,11 @@ refs(io::IO, ::LMTestResult; kw...) = refs(io, _TYPE_REFS[:LMTestResult]; kw...)
 
 # Granger causality
 refs(io::IO, ::GrangerCausalityResult; kw...) = refs(io, _TYPE_REFS[:GrangerCausalityResult]; kw...)
+
+# Panel VAR
+refs(io::IO, ::PVARModel; kw...) = refs(io, _TYPE_REFS[:PVARModel]; kw...)
+refs(io::IO, ::PVARStability; kw...) = refs(io, _TYPE_REFS[:PVARStability]; kw...)
+refs(io::IO, ::PVARTestResult; kw...) = refs(io, _TYPE_REFS[:PVARTestResult]; kw...)
 
 # Data containers (use source_refs field)
 function refs(io::IO, d::AbstractMacroData; format::Symbol=get_display_backend())

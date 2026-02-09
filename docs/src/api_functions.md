@@ -21,6 +21,12 @@ apply_tcode
 inverse_tcode
 ```
 
+### Filtering
+
+```@docs
+apply_filter
+```
+
 ### Summary Statistics
 
 ```@docs
@@ -292,6 +298,48 @@ Order   = [:function]
 Modules = [MacroEconometricModels]
 Pages   = ["factor/generalized.jl"]
 Order   = [:function]
+```
+
+---
+
+## Panel VAR
+
+### Estimation
+
+```@docs
+estimate_pvar
+estimate_pvar_feols
+```
+
+### Structural Analysis
+
+```@docs
+pvar_oirf
+pvar_girf
+pvar_fevd
+pvar_stability
+```
+
+### Bootstrap
+
+```@docs
+pvar_bootstrap_irf
+```
+
+### Specification Tests
+
+```@docs
+pvar_hansen_j
+pvar_mmsc
+pvar_lag_selection
+```
+
+### GMM Utilities
+
+```@docs
+linear_gmm_solve
+gmm_sandwich_vcov
+andrews_lu_mmsc
 ```
 
 ---

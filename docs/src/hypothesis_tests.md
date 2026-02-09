@@ -1,12 +1,8 @@
 # Hypothesis Tests
 
-This chapter covers statistical hypothesis tests for time series analysis: unit root tests for stationarity detection, cointegration tests for multivariate equilibrium relationships, Granger causality tests, model comparison tests, and VAR stability diagnostics.
-
-## Introduction
+This chapter covers statistical hypothesis tests for time series analysis: unit root tests for stationarity detection, cointegration tests for multivariate equilibrium relationships, model-specific specification tests, and generic model comparison tests.
 
 Before fitting dynamic models like VARs or Local Projections, it is essential to understand the stationarity properties of the data. Non-stationary series (those with unit roots) require different treatment than stationary series, as standard regression methods can lead to spurious results. After estimation, specification tests help validate the model and explore causal relationships.
-
-**MacroEconometricModels.jl** provides a comprehensive suite of hypothesis tests organized into three stages of the empirical workflow:
 
 ## Quick Start
 
@@ -30,32 +26,48 @@ is_stationary(m)                     # VAR stability check
 granger_test(m, 1, 2)               # Granger causality
 granger_test_all(m)                  # all-pairs causality matrix
 
+# --- Post-estimation: Model comparison ---
 m1 = estimate_var(Y, 1)
 lr_test(m1, m)                       # likelihood ratio test
 ```
 
-### Unit Root Tests (Pre-estimation)
+### Test Summary
+
+**Unit Root Tests** (pre-estimation)
+
 1. **ADF (Augmented Dickey-Fuller)**: Tests the null of a unit root against stationarity
 2. **KPSS**: Tests the null of stationarity against a unit root
 3. **Phillips-Perron**: Non-parametric unit root test with autocorrelation correction
 4. **Zivot-Andrews**: Unit root test allowing for endogenous structural break
 5. **Ng-Perron**: Modified tests with improved size properties
 
-### Cointegration Tests (Pre-estimation)
+**Cointegration Tests** (pre-estimation)
+
 6. **Johansen Cointegration**: Tests for cointegrating relationships among variables
 
-### Specification Tests (Post-estimation)
-7. **VAR Stationarity**: Check if an estimated VAR model is stable
-8. **Granger Causality**: Pairwise and block Wald tests for predictive causality in VARs
-9. **Model Comparison (LR/LM)**: Likelihood ratio and Lagrange multiplier tests for nested models (VAR, ARIMA, ARCH/GARCH, and more)
+**VAR** (post-estimation)
+
+7. **Stationarity Check**: Eigenvalue stability of companion matrix
+8. **Granger Causality**: Pairwise and block Wald tests for predictive causality
+
+**Panel VAR** (post-estimation)
+
+9. **Hansen J-Test**: Overidentifying restrictions test for GMM instruments
+10. **Andrews-Lu MMSC**: Model and moment selection criteria
+11. **Lag Selection**: Optimal lag order via MMSC comparison
+
+**Model Comparison Tests** (post-estimation, generic)
+
+12. **Likelihood Ratio (LR)**: Compares nested models via log-likelihood difference
+13. **Lagrange Multiplier (LM)**: Score-based test requiring only the restricted model
 
 ---
 
-# Unit Root Tests
+## Unit Root Tests
 
-## Augmented Dickey-Fuller Test
+### Augmented Dickey-Fuller Test
 
-### Theory
+#### Theory
 
 The Augmented Dickey-Fuller (ADF) test examines whether a time series has a unit root. Consider the autoregressive model:
 
@@ -83,7 +95,7 @@ The ADF statistic is the t-ratio ``\tau = \hat{\gamma} / \text{se}(\hat{\gamma})
 
 **Reference**: Dickey & Fuller (1979), MacKinnon (2010)
 
-### Julia Implementation
+#### Julia Implementation
 
 ```julia
 using MacroEconometricModels
@@ -100,13 +112,13 @@ result = adf_test(y; lags=:aic, regression=:constant)
 # - Automatic conclusion
 ```
 
-### Function Signature
+#### Function Signature
 
 ```@docs
 adf_test
 ```
 
-### Options
+#### Options
 
 | Argument | Description | Default |
 |----------|-------------|---------|
@@ -114,7 +126,7 @@ adf_test
 | `max_lags` | Maximum lags for automatic selection | `floor(12*(T/100)^0.25)` |
 | `regression` | Deterministic terms: `:none`, `:constant`, or `:trend` | `:constant` |
 
-### ADFResult Return Values
+#### ADFResult Return Values
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -125,16 +137,16 @@ adf_test
 | `critical_values` | `Dict{Int,T}` | Critical values at 1%, 5%, 10% significance levels |
 | `nobs` | `Int` | Number of observations used |
 
-### Interpreting Results
+#### Interpreting Results
 
 - **Reject H₀** (p-value < 0.05): Evidence against unit root; series appears stationary
 - **Fail to reject H₀** (p-value > 0.05): Cannot reject unit root; series may be non-stationary
 
 ---
 
-## KPSS Stationarity Test
+### KPSS Stationarity Test
 
-### Theory
+#### Theory
 
 The KPSS test (Kwiatkowski, Phillips, Schmidt & Shin, 1992) reverses the hypotheses of the ADF test:
 
@@ -161,7 +173,7 @@ where ``S_t = \sum_{s=1}^t \hat{e}_s`` are partial sums of residuals and ``\hat{
 
 **Reference**: Kwiatkowski et al. (1992)
 
-### Julia Implementation
+#### Julia Implementation
 
 ```julia
 using MacroEconometricModels
@@ -174,20 +186,20 @@ result = kpss_test(y; regression=:constant)
 result_trend = kpss_test(y; regression=:trend)
 ```
 
-### Function Signature
+#### Function Signature
 
 ```@docs
 kpss_test
 ```
 
-### Options
+#### Options
 
 | Argument | Description | Default |
 |----------|-------------|---------|
 | `regression` | Stationarity type: `:constant` (level) or `:trend` | `:constant` |
 | `bandwidth` | Bartlett kernel bandwidth, or `:auto` for Newey-West selection | `:auto` |
 
-### KPSSResult Return Values
+#### KPSSResult Return Values
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -198,12 +210,12 @@ kpss_test
 | `bandwidth` | `Int` | Bartlett kernel bandwidth used |
 | `nobs` | `Int` | Number of observations |
 
-### Interpreting Results
+#### Interpreting Results
 
 - **Reject H₀** (p-value < 0.05): Evidence against stationarity; series has a unit root
 - **Fail to reject H₀** (p-value > 0.05): Cannot reject stationarity
 
-### Combining ADF and KPSS
+#### Combining ADF and KPSS
 
 Using both tests together provides stronger inference:
 
@@ -216,9 +228,9 @@ Using both tests together provides stronger inference:
 
 ---
 
-## Phillips-Perron Test
+### Phillips-Perron Test
 
-### Theory
+#### Theory
 
 The Phillips-Perron (PP) test is a non-parametric alternative to the ADF test. Instead of augmenting with lagged differences, the PP test corrects the t-statistic for serial correlation using Newey-West standard errors.
 
@@ -240,7 +252,7 @@ where ``\hat{\gamma}_0`` is the short-run variance and ``\hat{\lambda}^2`` is th
 
 **Reference**: Phillips & Perron (1988)
 
-### Julia Implementation
+#### Julia Implementation
 
 ```julia
 using MacroEconometricModels
@@ -249,20 +261,20 @@ y = cumsum(randn(200))
 result = pp_test(y; regression=:constant)
 ```
 
-### Function Signature
+#### Function Signature
 
 ```@docs
 pp_test
 ```
 
-### Options
+#### Options
 
 | Argument | Description | Default |
 |----------|-------------|---------|
 | `regression` | Deterministic terms: `:none`, `:constant`, or `:trend` | `:constant` |
 | `bandwidth` | Newey-West bandwidth, or `:auto` | `:auto` |
 
-### PPResult Return Values
+#### PPResult Return Values
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -275,9 +287,9 @@ pp_test
 
 ---
 
-## Zivot-Andrews Test
+### Zivot-Andrews Test
 
-### Theory
+#### Theory
 
 The Zivot-Andrews test extends the ADF test by allowing for an **endogenous structural break** in the series. This is important because standard unit root tests have low power against stationary alternatives with structural breaks.
 
@@ -305,7 +317,7 @@ where:
 
 **Reference**: Zivot & Andrews (1992)
 
-### Julia Implementation
+#### Julia Implementation
 
 ```julia
 using MacroEconometricModels
@@ -319,13 +331,13 @@ println("Break detected at observation: ", result.break_index)
 println("Break location: ", result.break_fraction * 100, "% of sample")
 ```
 
-### Function Signature
+#### Function Signature
 
 ```@docs
 za_test
 ```
 
-### Options
+#### Options
 
 | Argument | Description | Default |
 |----------|-------------|---------|
@@ -333,7 +345,7 @@ za_test
 | `trim` | Trimming fraction for break search | `0.15` |
 | `lags` | Augmenting lags, or `:aic`/`:bic` | `:aic` |
 
-### ZAResult Return Values
+#### ZAResult Return Values
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -348,9 +360,9 @@ za_test
 
 ---
 
-## Ng-Perron Tests
+### Ng-Perron Tests
 
-### Theory
+#### Theory
 
 The Ng-Perron tests (2001) are modified unit root tests with improved size and power properties, especially in small samples. They use GLS detrending and report four test statistics:
 
@@ -371,7 +383,7 @@ where ``\bar{c} = -7`` (constant) or ``\bar{c} = -13.5`` (trend).
 
 **Reference**: Ng & Perron (2001)
 
-### Julia Implementation
+#### Julia Implementation
 
 ```julia
 using MacroEconometricModels
@@ -386,13 +398,13 @@ println("MSB: ", result.MSB)
 println("MPT: ", result.MPT)
 ```
 
-### Function Signature
+#### Function Signature
 
 ```@docs
 ngperron_test
 ```
 
-### NgPerronResult Return Values
+#### NgPerronResult Return Values
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -409,9 +421,9 @@ ngperron_test
 
 ---
 
-## Convenience Functions
+### Convenience Functions
 
-### Summary of Multiple Tests
+#### Summary of Multiple Tests
 
 ```julia
 using MacroEconometricModels
@@ -429,7 +441,7 @@ summary.results[:kpss]
 println(summary.conclusion)
 ```
 
-### Test All Variables
+#### Test All Variables
 
 ```julia
 using MacroEconometricModels
@@ -447,7 +459,7 @@ for (i, r) in enumerate(results)
 end
 ```
 
-### Function Signatures
+#### Function Signatures
 
 ```@docs
 unit_root_summary
@@ -456,11 +468,11 @@ test_all_variables
 
 ---
 
-# Cointegration Tests
+## Cointegration Tests
 
-## Johansen Cointegration Test
+### Johansen Cointegration Test
 
-### Theory
+#### Theory
 
 The Johansen test examines whether multiple I(1) series share common stochastic trends, i.e., are **cointegrated**. Consider a VAR(p) in levels:
 
@@ -493,7 +505,7 @@ Two test statistics are computed:
 
 **Reference**: Johansen (1991), Osterwald-Lenum (1992)
 
-### Julia Implementation
+#### Julia Implementation
 
 ```julia
 using MacroEconometricModels
@@ -513,20 +525,20 @@ println("Cointegrating vectors:\n", result.eigenvectors[:, 1:result.rank])
 println("Adjustment coefficients:\n", result.adjustment)
 ```
 
-### Function Signature
+#### Function Signature
 
 ```@docs
 johansen_test
 ```
 
-### Options
+#### Options
 
 | Argument | Description | Default |
 |----------|-------------|---------|
 | `p` | Lags in VECM representation | Required |
 | `deterministic` | `:none`, `:constant`, or `:trend` | `:constant` |
 
-### JohansenResult Return Values
+#### JohansenResult Return Values
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -544,7 +556,7 @@ johansen_test
 | `lags` | `Int` | Number of VECM lags |
 | `nobs` | `Int` | Number of observations |
 
-### Interpreting Results
+#### Interpreting Results
 
 The test sequentially tests:
 1. ``H_0: r = 0`` (no cointegration)
@@ -555,11 +567,11 @@ Stop at the first non-rejected hypothesis; that gives the cointegration rank.
 
 ---
 
-# Specification Tests
+## VAR
 
-## VAR Stationarity Check
+### Stationarity Check
 
-### Theory
+#### Theory
 
 A VAR(p) model is **stable** (stationary) if and only if all eigenvalues of the companion matrix lie strictly inside the unit circle:
 
@@ -577,14 +589,14 @@ I_n & 0 & \cdots & 0 & 0 \\
 
 If violated, the VAR is explosive or contains unit roots, and standard asymptotic theory does not apply.
 
-### Julia Implementation
+#### Julia Implementation
 
 ```julia
 using MacroEconometricModels
 
 # Estimate VAR
 Y = randn(200, 3)
-model = fit(VARModel, Y, 2)
+model = estimate_var(Y, 2)
 
 # Check stationarity
 result = is_stationary(model)
@@ -599,13 +611,13 @@ else
 end
 ```
 
-### Function Signature
+#### Function Signature
 
 ```@docs
 is_stationary
 ```
 
-### VARStationarityResult Return Values
+#### VARStationarityResult Return Values
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -616,11 +628,11 @@ is_stationary
 
 ---
 
-## Granger Causality Tests
+### Granger Causality Tests
 
 The Granger causality test (Granger 1969) examines whether lagged values of one variable help predict another variable in a VAR system.
 
-### Theory
+#### Theory
 
 Given a VAR(p) model with n variables, the **pairwise** test examines whether variable j Granger-causes variable i:
 
@@ -635,7 +647,7 @@ The **block** (multivariate) test generalizes to groups of cause variables, with
 !!! note "Technical Note"
     Granger causality is a statistical concept based on predictability, not true causation. Variable j "Granger-causes" variable i if past values of j contain information useful for predicting i beyond what is contained in past values of i and other variables. The test is valid under the assumption that the VAR model is correctly specified and the error terms are white noise.
 
-### Quick Start
+#### Quick Start
 
 ```julia
 using MacroEconometricModels, Random
@@ -656,12 +668,12 @@ results = granger_test_all(m)
 
 **Interpretation.** If the p-value is below your significance level (e.g., 0.05), reject ``H_0`` and conclude the cause variable(s) Granger-cause the effect variable. The `granger_test_all` function returns an n×n matrix of p-values where entry [i,j] tests whether variable j Granger-causes variable i.
 
-### Function Signatures
+#### Function Signatures
 
 - [`granger_test(model, cause, effect)`](@ref granger_test) — Pairwise or block Granger causality test
 - [`granger_test_all(model)`](@ref granger_test_all) — All-pairs pairwise Granger causality matrix
 
-### Return Values
+#### Return Values
 
 **`GrangerCausalityResult`**
 
@@ -677,7 +689,7 @@ results = granger_test_all(m)
 | `nobs` | `Int` | Effective number of observations |
 | `test_type` | `Symbol` | `:pairwise` or `:block` |
 
-### Complete Example
+#### Complete Example
 
 ```julia
 using MacroEconometricModels, Random
@@ -713,9 +725,118 @@ println("Block [1,3] → 2: p = ", round(g_block.pvalue, digits=4))
 
 ---
 
-## Model Comparison: LR and LM Tests
+## Panel VAR
 
-The **likelihood ratio (LR) test** and **Lagrange multiplier (LM) test** form two legs of the classical "trinity" of specification tests (alongside the Wald test). Both test whether a restricted (simpler) model is adequate relative to an unrestricted (more general) model.
+### Hansen J-Test
+
+The Hansen (1982) J-test evaluates whether the overidentifying restrictions (moment conditions) in GMM estimation are valid.
+
+#### Theory
+
+```math
+J = N \bar{g}' W_{opt} \bar{g} \sim \chi^2(q - k)
+```
+
+where ``\bar{g} = N^{-1} \sum_i Z_i' e_i`` is the average moment condition, ``W_{opt}`` is the optimal weighting matrix, ``q`` is the number of instruments, and ``k`` is the number of parameters per equation.
+
+- ``H_0``: All moment conditions are valid
+- ``H_1``: Some moment conditions are invalid
+
+#### Julia Implementation
+
+```julia
+using MacroEconometricModels, DataFrames, Random
+Random.seed!(42)
+
+# Set up panel data (see Panel VAR page for full example)
+N, T_total, m = 50, 20, 3
+data = zeros(N * T_total, m)
+for i in 1:N
+    mu = randn(m) * 0.5
+    for t in 2:T_total
+        idx = (i-1)*T_total + t
+        data[idx, :] = mu + 0.5 * data[(i-1)*T_total + t - 1, :] + 0.2 * randn(m)
+    end
+end
+df = DataFrame(data, ["y1", "y2", "y3"])
+df.id = repeat(1:N, inner=T_total)
+df.time = repeat(1:T_total, outer=N)
+pd = xtset(df, :id, :time)
+
+model = estimate_pvar(pd, 2; steps=:twostep)
+
+# Hansen J-test
+j = pvar_hansen_j(model)
+j.statistic     # J-statistic
+j.pvalue        # p-value (χ² distribution)
+j.df            # degrees of freedom = instruments - parameters
+```
+
+**Interpretation.** Failure to reject ``H_0`` (p-value > 0.05) supports the validity of the instruments. Rejection suggests instrument invalidity or model misspecification.
+
+!!! warning "J-Test and Instrument Count"
+    The J-test has low power when the number of instruments is large relative to ``N``. A non-rejection does not necessarily validate the instruments.
+
+#### Return Values
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `statistic` | `T` | J-statistic |
+| `pvalue` | `T` | p-value from χ²(df) |
+| `df` | `Int` | Degrees of freedom (instruments − parameters) |
+| `n_instruments` | `Int` | Number of moment conditions |
+| `n_params` | `Int` | Number of estimated parameters |
+
+---
+
+### Andrews-Lu MMSC
+
+Andrews-Lu (2001) Model and Moment Selection Criteria extend information criteria to GMM settings, enabling comparison of PVAR models with different lag orders or instrument sets.
+
+#### Theory
+
+```math
+\text{MMSC-BIC} = J - (c - b) \ln(n), \quad
+\text{MMSC-AIC} = J - 2(c - b), \quad
+\text{MMSC-HQIC} = J - Q(c - b) \ln(\ln(n))
+```
+
+where ``J`` is the Hansen J-statistic, ``c`` = number of instruments, ``b`` = number of parameters, and ``n`` = observations. Lower values are preferred.
+
+#### Julia Implementation
+
+```julia
+mmsc = pvar_mmsc(model)
+mmsc.bic     # MMSC-BIC
+mmsc.aic     # MMSC-AIC
+mmsc.hqic    # MMSC-HQIC
+```
+
+See [`pvar_mmsc`](@ref) in the [API Reference](@ref).
+
+---
+
+### Lag Selection
+
+Select the optimal PVAR lag order by estimating models for ``p = 1, \ldots, p_{\max}`` and comparing Andrews-Lu MMSC criteria.
+
+#### Julia Implementation
+
+```julia
+sel = pvar_lag_selection(pd, 4)
+sel.best_bic    # optimal lag by BIC
+sel.best_aic    # optimal lag by AIC
+sel.best_hqic   # optimal lag by HQIC
+sel.table       # comparison table (p × 4: lag, BIC, AIC, HQIC)
+```
+
+See [`pvar_lag_selection`](@ref) in the [API Reference](@ref).
+
+---
+
+## Model Comparison Tests
+
+The **likelihood ratio (LR) test** and **Lagrange multiplier (LM) test** form two legs of the classical "trinity" of specification tests (alongside the Wald test). Both test whether a restricted (simpler) model is adequate relative to an unrestricted (more general) model. These tests are generic and work across model families.
 
 ### Theory
 
@@ -812,9 +933,9 @@ lm_test(arch1, garch11)     # LM supports ARCH→GARCH nesting
 
 ---
 
-# Reference
+## Reference
 
-## Result Types
+### Result Types
 
 All test results implement the StatsAPI interface:
 
@@ -829,7 +950,7 @@ dof(result)     # Degrees of freedom
 pvalue(result)  # P-value
 ```
 
-### Type Hierarchy
+#### Type Hierarchy
 
 See the [API Reference](@ref) for detailed type documentation.
 
@@ -844,14 +965,15 @@ See the [API Reference](@ref) for detailed type documentation.
 
 **Specification Tests** — inherit from `StatsAPI.HypothesisTest`:
 - `GrangerCausalityResult` - Granger causality test result (pairwise or block)
+- `PVARTestResult` - Panel VAR specification test result (Hansen J, etc.)
 - `LRTestResult` - Likelihood ratio test result
 - `LMTestResult` - Lagrange multiplier (score) test result
 
 ---
 
-## Practical Workflow
+### Practical Workflow
 
-### Step-by-Step Unit Root Analysis
+#### Step-by-Step Unit Root Analysis
 
 ```julia
 using MacroEconometricModels
@@ -884,7 +1006,7 @@ else
 end
 ```
 
-### Pre-VAR Analysis
+#### Pre-VAR Analysis
 
 ```julia
 using MacroEconometricModels
@@ -912,7 +1034,7 @@ end
 # Consider ARDL bounds test or transform I(1) variables
 ```
 
-### Post-Estimation Diagnostics
+#### Post-Estimation Diagnostics
 
 ```julia
 using MacroEconometricModels
@@ -936,36 +1058,41 @@ println("VAR(2) vs VAR(3): ", lr_test(m, m3))
 
 ---
 
-## References
+### References
 
-### Unit Root Tests
+#### Unit Root Tests
 
-- Dickey, David A., and Wayne A. Fuller. 1979. "Distribution of the Estimators for Autoregressive Time Series with a Unit Root." *Journal of the American Statistical Association* 74 (366): 427–431. [https://doi.org/10.1080/01621459.1979.10482531](https://doi.org/10.1080/01621459.1979.10482531)
-- Kwiatkowski, Denis, Peter C. B. Phillips, Peter Schmidt, and Yongcheol Shin. 1992. "Testing the Null Hypothesis of Stationarity Against the Alternative of a Unit Root." *Journal of Econometrics* 54 (1–3): 159–178. [https://doi.org/10.1016/0304-4076(92)90104-Y](https://doi.org/10.1016/0304-4076(92)90104-Y)
+- Dickey, David A., and Wayne A. Fuller. 1979. "Distribution of the Estimators for Autoregressive Time Series with a Unit Root." *Journal of the American Statistical Association* 74 (366): 427--431. [https://doi.org/10.1080/01621459.1979.10482531](https://doi.org/10.1080/01621459.1979.10482531)
+- Kwiatkowski, Denis, Peter C. B. Phillips, Peter Schmidt, and Yongcheol Shin. 1992. "Testing the Null Hypothesis of Stationarity Against the Alternative of a Unit Root." *Journal of Econometrics* 54 (1--3): 159--178. [https://doi.org/10.1016/0304-4076(92)90104-Y](https://doi.org/10.1016/0304-4076(92)90104-Y)
 - MacKinnon, James G. 2010. "Critical Values for Cointegration Tests." Queen's Economics Department Working Paper No. 1227.
-- Ng, Serena, and Pierre Perron. 2001. "Lag Length Selection and the Construction of Unit Root Tests with Good Size and Power." *Econometrica* 69 (6): 1519–1554. [https://doi.org/10.1111/1468-0262.00256](https://doi.org/10.1111/1468-0262.00256)
-- Phillips, Peter C. B., and Pierre Perron. 1988. "Testing for a Unit Root in Time Series Regression." *Biometrika* 75 (2): 335–346. [https://doi.org/10.1093/biomet/75.2.335](https://doi.org/10.1093/biomet/75.2.335)
-- Zivot, Eric, and Donald W. K. Andrews. 1992. "Further Evidence on the Great Crash, the Oil-Price Shock, and the Unit-Root Hypothesis." *Journal of Business & Economic Statistics* 10 (3): 251–270. [https://doi.org/10.1080/07350015.1992.10509904](https://doi.org/10.1080/07350015.1992.10509904)
+- Ng, Serena, and Pierre Perron. 2001. "Lag Length Selection and the Construction of Unit Root Tests with Good Size and Power." *Econometrica* 69 (6): 1519--1554. [https://doi.org/10.1111/1468-0262.00256](https://doi.org/10.1111/1468-0262.00256)
+- Phillips, Peter C. B., and Pierre Perron. 1988. "Testing for a Unit Root in Time Series Regression." *Biometrika* 75 (2): 335--346. [https://doi.org/10.1093/biomet/75.2.335](https://doi.org/10.1093/biomet/75.2.335)
+- Zivot, Eric, and Donald W. K. Andrews. 1992. "Further Evidence on the Great Crash, the Oil-Price Shock, and the Unit-Root Hypothesis." *Journal of Business & Economic Statistics* 10 (3): 251--270. [https://doi.org/10.1080/07350015.1992.10509904](https://doi.org/10.1080/07350015.1992.10509904)
 
-### Cointegration
+#### Cointegration
 
-- Johansen, Søren. 1991. "Estimation and Hypothesis Testing of Cointegration Vectors in Gaussian Vector Autoregressive Models." *Econometrica* 59 (6): 1551–1580. [https://doi.org/10.2307/2938278](https://doi.org/10.2307/2938278)
-- Johansen, Søren. 1995. *Likelihood-Based Inference in Cointegrated Vector Autoregressive Models*. Oxford: Oxford University Press. ISBN 978-0-19-877450-5.
-- Osterwald-Lenum, Michael. 1992. "A Note with Quantiles of the Asymptotic Distribution of the Maximum Likelihood Cointegration Rank Test Statistics." *Oxford Bulletin of Economics and Statistics* 54 (3): 461–472. [https://doi.org/10.1111/j.1468-0084.1992.tb00013.x](https://doi.org/10.1111/j.1468-0084.1992.tb00013.x)
+- Johansen, Soren. 1991. "Estimation and Hypothesis Testing of Cointegration Vectors in Gaussian Vector Autoregressive Models." *Econometrica* 59 (6): 1551--1580. [https://doi.org/10.2307/2938278](https://doi.org/10.2307/2938278)
+- Johansen, Soren. 1995. *Likelihood-Based Inference in Cointegrated Vector Autoregressive Models*. Oxford: Oxford University Press. ISBN 978-0-19-877450-5.
+- Osterwald-Lenum, Michael. 1992. "A Note with Quantiles of the Asymptotic Distribution of the Maximum Likelihood Cointegration Rank Test Statistics." *Oxford Bulletin of Economics and Statistics* 54 (3): 461--472. [https://doi.org/10.1111/j.1468-0084.1992.tb00013.x](https://doi.org/10.1111/j.1468-0084.1992.tb00013.x)
 
-### Granger Causality
+#### VAR
 
-- Granger, C. W. J. 1969. "Investigating Causal Relations by Econometric Models and Cross-spectral Methods." *Econometrica* 37 (3): 424–438. [https://doi.org/10.2307/1912791](https://doi.org/10.2307/1912791)
+- Granger, C. W. J. 1969. "Investigating Causal Relations by Econometric Models and Cross-spectral Methods." *Econometrica* 37 (3): 424--438. [https://doi.org/10.2307/1912791](https://doi.org/10.2307/1912791)
 
-### Model Comparison
+#### Panel VAR
 
-- Wilks, Samuel S. 1938. "The Large-Sample Distribution of the Likelihood Ratio for Testing Composite Hypotheses." *Annals of Mathematical Statistics* 9 (1): 60–62. [https://doi.org/10.1214/aoms/1177732360](https://doi.org/10.1214/aoms/1177732360)
-- Neyman, Jerzy, and Egon S. Pearson. 1933. "On the Problem of the Most Efficient Tests of Statistical Hypotheses." *Philosophical Transactions of the Royal Society A* 231 (694–706): 289–337. [https://doi.org/10.1098/rsta.1933.0009](https://doi.org/10.1098/rsta.1933.0009)
-- Rao, C. Radhakrishna. 1948. "Large Sample Tests of Statistical Hypotheses Concerning Several Parameters with Applications to Problems of Estimation." *Mathematical Proceedings of the Cambridge Philosophical Society* 44 (1): 50–57. [https://doi.org/10.1017/S0305004100023987](https://doi.org/10.1017/S0305004100023987)
-- Silvey, S. D. 1959. "The Lagrangian Multiplier Test." *Annals of Mathematical Statistics* 30 (2): 389–407. [https://doi.org/10.1214/aoms/1177706259](https://doi.org/10.1214/aoms/1177706259)
+- Hansen, Lars Peter. 1982. "Large Sample Properties of Generalized Method of Moments Estimators." *Econometrica* 50 (4): 1029--1054. [https://doi.org/10.2307/1912775](https://doi.org/10.2307/1912775)
+- Andrews, Donald W. K., and Biao Lu. 2001. "Consistent Model and Moment Selection Procedures for GMM Estimation." *Journal of Econometrics* 101 (1): 123--164. [https://doi.org/10.1016/S0304-4076(00)00077-4](https://doi.org/10.1016/S0304-4076(00)00077-4)
 
-### Textbooks
+#### Model Comparison
+
+- Wilks, Samuel S. 1938. "The Large-Sample Distribution of the Likelihood Ratio for Testing Composite Hypotheses." *Annals of Mathematical Statistics* 9 (1): 60--62. [https://doi.org/10.1214/aoms/1177732360](https://doi.org/10.1214/aoms/1177732360)
+- Neyman, Jerzy, and Egon S. Pearson. 1933. "On the Problem of the Most Efficient Tests of Statistical Hypotheses." *Philosophical Transactions of the Royal Society A* 231 (694--706): 289--337. [https://doi.org/10.1098/rsta.1933.0009](https://doi.org/10.1098/rsta.1933.0009)
+- Rao, C. Radhakrishna. 1948. "Large Sample Tests of Statistical Hypotheses Concerning Several Parameters with Applications to Problems of Estimation." *Mathematical Proceedings of the Cambridge Philosophical Society* 44 (1): 50--57. [https://doi.org/10.1017/S0305004100023987](https://doi.org/10.1017/S0305004100023987)
+- Silvey, S. D. 1959. "The Lagrangian Multiplier Test." *Annals of Mathematical Statistics* 30 (2): 389--407. [https://doi.org/10.1214/aoms/1177706259](https://doi.org/10.1214/aoms/1177706259)
+
+#### Textbooks
 
 - Hamilton, James D. 1994. *Time Series Analysis*. Princeton, NJ: Princeton University Press. ISBN 978-0-691-04289-3.
-- Lütkepohl, Helmut. 2005. *New Introduction to Multiple Time Series Analysis*. Berlin: Springer. ISBN 978-3-540-40172-8.
+- Lutkepohl, Helmut. 2005. *New Introduction to Multiple Time Series Analysis*. Berlin: Springer. ISBN 978-3-540-40172-8.
 - Enders, Walter. 2014. *Applied Econometric Time Series*. 4th ed. Hoboken, NJ: Wiley. ISBN 978-1-118-80856-6.

@@ -519,6 +519,79 @@ using Statistics
             @test_throws ArgumentError apply_tcode(d, [1])  # wrong length
         end
 
+        @testset "PanelData apply_tcode per-variable" begin
+            df = DataFrame(id=repeat(1:3, inner=50),
+                           t=repeat(1:50, 3),
+                           x=rand(150) .+ 1.0,
+                           y=rand(150) .+ 1.0)
+            pd = xtset(df, :id, :t)
+            pd2 = apply_tcode(pd, [5, 5])
+            @test pd2 isa PanelData
+            @test ngroups(pd2) == 3
+            @test nvars(pd2) == 2
+            @test pd2.tcode == [5, 5]
+            # Each group loses 1 row: 3 * 49 = 147
+            @test nobs(pd2) == 147
+            @test isbalanced(pd2)
+        end
+
+        @testset "PanelData apply_tcode uniform" begin
+            df = DataFrame(id=repeat(1:2, inner=30),
+                           t=repeat(1:30, 2),
+                           x=rand(60) .+ 1.0)
+            pd = xtset(df, :id, :t)
+            pd2 = apply_tcode(pd, 5)
+            @test nobs(pd2) == 58  # 2 * 29
+            @test pd2.tcode == [5]
+        end
+
+        @testset "PanelData apply_tcode mixed codes" begin
+            df = DataFrame(id=repeat(1:2, inner=50),
+                           t=repeat(1:50, 2),
+                           x=rand(100) .+ 1.0,
+                           y=randn(100))
+            pd = xtset(df, :id, :t)
+            pd2 = apply_tcode(pd, [5, 1])  # log-diff x, leave y in levels
+            # tcode 5 loses 1 row per group, tcode 1 loses 0
+            # max_lost = 1 per group → 49 obs per group
+            @test nobs(pd2) == 98
+            @test pd2.tcode == [5, 1]
+        end
+
+        @testset "PanelData apply_tcode second diff" begin
+            df = DataFrame(id=repeat(1:2, inner=50),
+                           t=repeat(1:50, 2),
+                           x=rand(100) .+ 1.0,
+                           y=rand(100) .+ 1.0)
+            pd = xtset(df, :id, :t)
+            pd2 = apply_tcode(pd, [6, 5])  # tcode 6 loses 2, tcode 5 loses 1
+            # max_lost = 2 per group → 48 obs per group
+            @test nobs(pd2) == 96
+        end
+
+        @testset "PanelData apply_tcode metadata propagation" begin
+            df = DataFrame(id=repeat(1:2, inner=30),
+                           t=repeat(1:30, 2),
+                           x=rand(60) .+ 1.0,
+                           y=rand(60) .+ 1.0)
+            vd = Dict("x" => "X variable", "y" => "Y variable")
+            pd = xtset(df, :id, :t; desc="Test panel", vardesc=vd)
+            pd2 = apply_tcode(pd, [5, 1])
+            @test desc(pd2) == "Test panel"
+            @test vardesc(pd2, "x") == "X variable"
+            @test vardesc(pd2, "y") == "Y variable"
+            @test groups(pd2) == ["1", "2"]
+        end
+
+        @testset "PanelData apply_tcode validation" begin
+            df = DataFrame(id=repeat(1:2, inner=10),
+                           t=repeat(1:10, 2),
+                           x=rand(20) .+ 1.0,
+                           y=rand(20) .+ 1.0)
+            pd = xtset(df, :id, :t)
+            @test_throws ArgumentError apply_tcode(pd, [1])  # wrong length
+        end
+
         @testset "inverse_tcode tcode 1" begin
             y = [1.0, 2.0, 3.0]
             @test inverse_tcode(y, 1) == y
@@ -1063,7 +1136,297 @@ using Statistics
     end
 
     # =========================================================================
-    # 13. source_refs field
+    # 13. apply_filter
+    # =========================================================================
+    @testset "apply_filter" begin
+
+        # --- TimeSeriesData: single symbol for all variables ---
+        @testset "Single symbol all vars — HP cycle" begin
+            Random.seed!(42)
+            d = TimeSeriesData(cumsum(randn(200, 3), dims=1); varnames=["GDP","CPI","FFR"])
+            d_hp = apply_filter(d, :hp; component=:cycle)
+            @test d_hp isa TimeSeriesData
+            @test nobs(d_hp) == 200  # HP preserves length
+            @test nvars(d_hp) == 3
+            @test varnames(d_hp) == ["GDP", "CPI", "FFR"]
+            # Cycle should have near-zero mean relative to original
+            @test abs(mean(d_hp.data[:, 1])) < 30.0
+        end
+
+        @testset "Single symbol all vars — HP trend" begin
+            Random.seed!(42)
+            d = TimeSeriesData(cumsum(randn(200, 3), dims=1))
+            d_trend = apply_filter(d, :hp; component=:trend)
+            @test nobs(d_trend) == 200
+            @test nvars(d_trend) == 3
+        end
+
+        @testset "Single symbol — Hamilton" begin
+            Random.seed!(42)
+            d = TimeSeriesData(cumsum(randn(200, 3), dims=1))
+            d_ham = apply_filter(d, :hamilton; component=:cycle)
+            # Hamilton drops h+p-1 obs from start
+            @test nobs(d_ham) < 200
+            @test nobs(d_ham) > 150
+            @test nvars(d_ham) == 3
+        end
+
+        @testset "Single symbol — Baxter-King" begin
+            Random.seed!(42)
+            d = TimeSeriesData(cumsum(randn(200, 3), dims=1))
+            d_bk = apply_filter(d, :bk; component=:cycle)
+            @test nobs(d_bk) < 200  # BK loses 2K obs
+            @test nvars(d_bk) == 3
+        end
+
+        @testset "Single symbol — Boosted HP" begin
+            Random.seed!(42)
+            d = TimeSeriesData(cumsum(randn(200, 3), dims=1))
+            d_bhp = apply_filter(d, :boosted_hp; component=:cycle)
+            @test nobs(d_bhp) == 200
+            @test nvars(d_bhp) == 3
+        end
+
+        # --- Per-variable symbol specs ---
+        @testset "Per-variable symbols" begin
+            Random.seed!(42)
+            d = TimeSeriesData(cumsum(randn(200, 3), dims=1); varnames=["GDP","CPI","FFR"])
+            d2 = apply_filter(d, [:hp, :hp, :hp]; component=:cycle)
+            @test nobs(d2) == 200
+            @test nvars(d2) == 3
+        end
+
+        @testset "Per-variable with nothing pass-through" begin
+            Random.seed!(42)
+            d = TimeSeriesData(cumsum(randn(200, 3), dims=1); varnames=["GDP","CPI","FFR"])
+            d2 = apply_filter(d, [:hp, nothing, :hp]; component=:cycle)
+            @test nobs(d2) == 200
+            @test nvars(d2) == 3
+            # Pass-through column should be unchanged
+            @test d2.data[:, 2] ≈ d.data[:, 2]
+        end
+
+        @testset "All nothing — identity" begin
+            Random.seed!(42)
+            d = TimeSeriesData(randn(100, 2))
+            d2 = apply_filter(d, [nothing, nothing])
+            @test d2.data ≈ d.data
+            @test nobs(d2) == 100
+        end
+
+        # --- Tuple component overrides ---
+        @testset "Tuple per-variable overrides" begin
+            Random.seed!(42)
+            d = TimeSeriesData(cumsum(randn(200, 3), dims=1); varnames=["GDP","CPI","FFR"])
+            d2 = apply_filter(d, [(:hp, :trend), (:hp, :cycle), nothing])
+            @test nobs(d2) == 200
+            @test nvars(d2) == 3
+        end
+
+        # --- vars keyword ---
+        @testset "vars keyword with String" begin
+            Random.seed!(42)
+            d = TimeSeriesData(cumsum(randn(200, 3), dims=1); varnames=["GDP","CPI","FFR"])
+            d2 = apply_filter(d, :hp; vars=["GDP", "CPI"], component=:cycle)
+            @test nobs(d2) == 200
+            # FFR should be pass-through
+            @test d2.data[:, 3] ≈ d.data[:, 3]
+        end
+
+        @testset "vars keyword with Int" begin
+            Random.seed!(42)
+            d = TimeSeriesData(cumsum(randn(200, 3), dims=1))
+            d2 = apply_filter(d, :hp; vars=[1, 3], component=:cycle)
+            @test nobs(d2) == 200
+            # Column 2 should be pass-through
+            @test d2.data[:, 2] ≈ d.data[:, 2]
+        end
+
+        @testset "vars keyword invalid var" begin
+            d = TimeSeriesData(randn(50, 2); varnames=["a", "b"])
+            @test_throws ArgumentError apply_filter(d, :hp; vars=["nonexistent"])
+        end
+
+        @testset "vars keyword invalid index" begin
+            d = TimeSeriesData(randn(50, 2))
+            @test_throws BoundsError apply_filter(d, :hp; vars=[0])
+            @test_throws BoundsError apply_filter(d, :hp; vars=[3])
+        end
+
+        # --- Pre-computed filter results ---
+        @testset "Pre-computed filter result" begin
+            Random.seed!(42)
+            d = TimeSeriesData(cumsum(randn(200, 2), dims=1))
+            r1 = hp_filter(d.data[:, 1])
+            d2 = apply_filter(d, [r1, :hp]; component=:cycle)
+            @test nobs(d2) == 200
+            @test nvars(d2) == 2
+        end
+
+        @testset "Pre-computed Hamilton result" begin
+            Random.seed!(42)
+            d = TimeSeriesData(cumsum(randn(200, 2), dims=1))
+            r1 = hamilton_filter(d.data[:, 1])
+            d2 = apply_filter(d, [r1, nothing])
+            # Hamilton trims, nothing doesn't — common range from Hamilton
+            @test nobs(d2) < 200
+        end
+
+        # --- Mixed specs with trimming ---
+        @testset "Mixed HP + Hamilton — common range trimming" begin
+            Random.seed!(42)
+            d = TimeSeriesData(cumsum(randn(200, 2), dims=1))
+            d2 = apply_filter(d, [:hp, :hamilton]; component=:cycle)
+            # Should trim to Hamilton's valid range (shorter)
+            r_ham = hamilton_filter(d.data[:, 2])
+            @test nobs(d2) == length(r_ham.valid_range)
+        end
+
+        @testset "Mixed HP + BK — common range trimming" begin
+            Random.seed!(42)
+            d = TimeSeriesData(cumsum(randn(200, 2), dims=1))
+            d2 = apply_filter(d, [:hp, :bk]; component=:cycle)
+            r_bk = baxter_king(d.data[:, 2])
+            @test nobs(d2) == length(r_bk.valid_range)
+        end
+
+        # --- Metadata propagation ---
+        @testset "Metadata propagation" begin
+            Random.seed!(42)
+            vd = Dict("GDP" => "Real GDP", "CPI" => "Consumer prices")
+            d = TimeSeriesData(cumsum(randn(200, 2), dims=1);
+                varnames=["GDP", "CPI"], frequency=Quarterly,
+                desc="Test data", vardesc=vd,
+                source_refs=[:mccracken_ng2016])
+            d2 = apply_filter(d, :hp; component=:cycle)
+            @test desc(d2) == "Test data"
+            @test vardesc(d2, "GDP") == "Real GDP"
+            @test vardesc(d2, "CPI") == "Consumer prices"
+            @test d2.source_refs == [:mccracken_ng2016]
+            @test frequency(d2) == Quarterly
+            @test varnames(d2) == ["GDP", "CPI"]
+        end
+
+        @testset "Time index trimmed correctly" begin
+            Random.seed!(42)
+            d = TimeSeriesData(cumsum(randn(200, 2), dims=1);
+                time_index=collect(1:200))
+            d2 = apply_filter(d, :hamilton; component=:cycle)
+            # Time index should start after Hamilton's initial obs loss
+            @test d2.time_index[1] > 1
+            @test d2.time_index[end] == 200
+            @test length(d2.time_index) == nobs(d2)
+        end
+
+        # --- Single variable ---
+        @testset "Single variable" begin
+            Random.seed!(42)
+            d = TimeSeriesData(cumsum(randn(200)); varname="GDP")
+            d2 = apply_filter(d, :hp; component=:cycle)
+            @test nobs(d2) == 200
+            @test nvars(d2) == 1
+        end
+
+        # --- Error cases ---
+        @testset "Invalid filter symbol" begin
+            d = TimeSeriesData(randn(50, 2))
+            @test_throws ArgumentError apply_filter(d, :invalid_filter)
+        end
+
+        @testset "Mismatched specs length" begin
+            d = TimeSeriesData(randn(50, 3))
+            @test_throws ArgumentError apply_filter(d, [:hp, :hp])  # 2 specs for 3 vars
+        end
+
+        @testset "Invalid component" begin
+            d = TimeSeriesData(cumsum(randn(50, 1), dims=1))
+            @test_throws ArgumentError apply_filter(d, [:hp]; component=:invalid)
+        end
+
+        # --- kwargs forwarding ---
+        @testset "kwargs forwarded to filter — HP lambda" begin
+            Random.seed!(42)
+            d = TimeSeriesData(cumsum(randn(200, 2), dims=1))
+            d_default = apply_filter(d, :hp; component=:cycle)
+            d_smooth = apply_filter(d, :hp; component=:cycle, lambda=100.0)
+            # Different lambda should produce different cycles
+            @test !(d_default.data[:, 1] ≈ d_smooth.data[:, 1])
+        end
+
+        # --- PanelData ---
+        @testset "PanelData — single symbol" begin
+            Random.seed!(42)
+            df = DataFrame(
+                id=repeat(1:3, inner=100),
+                t=repeat(1:100, 3),
+                x=cumsum(randn(300)),
+                y=cumsum(randn(300)))
+            pd = xtset(df, :id, :t)
+            pd_hp = apply_filter(pd, :hp; component=:cycle)
+            @test pd_hp isa PanelData
+            @test ngroups(pd_hp) == 3
+            @test nvars(pd_hp) == 2
+            # Each group has 100 obs (HP preserves length), total = 300
+            @test nobs(pd_hp) == 300
+            @test isbalanced(pd_hp)
+        end
+
+        @testset "PanelData — Hamilton (shorter)" begin
+            Random.seed!(42)
+            df = DataFrame(
+                id=repeat(1:2, inner=100),
+                t=repeat(1:100, 2),
+                x=cumsum(randn(200)))
+            pd = xtset(df, :id, :t)
+            pd_ham = apply_filter(pd, :hamilton; component=:cycle)
+            @test pd_ham isa PanelData
+            @test nobs(pd_ham) < 200  # each group lost obs
+            @test ngroups(pd_ham) == 2
+        end
+
+        @testset "PanelData — vars keyword" begin
+            Random.seed!(42)
+            df = DataFrame(
+                id=repeat(1:2, inner=100),
+                t=repeat(1:100, 2),
+                x=cumsum(randn(200)),
+                y=randn(200))
+            pd = xtset(df, :id, :t)
+            pd2 = apply_filter(pd, :hp; vars=["x"], component=:cycle)
+            @test nvars(pd2) == 2
+            @test nobs(pd2) == 200  # HP preserves length
+        end
+
+        @testset "PanelData — per-variable specs vector" begin
+            Random.seed!(42)
+            df = DataFrame(
+                id=repeat(1:2, inner=100),
+                t=repeat(1:100, 2),
+                x=cumsum(randn(200)),
+                y=cumsum(randn(200)))
+            pd = xtset(df, :id, :t)
+            pd2 = apply_filter(pd, [:hp, nothing]; component=:cycle)
+            @test nvars(pd2) == 2
+            @test nobs(pd2) == 200
+        end
+
+        @testset "PanelData metadata propagation" begin
+            Random.seed!(42)
+            df = DataFrame(
+                id=repeat(1:2, inner=50),
+                t=repeat(1:50, 2),
+                x=cumsum(randn(100)))
+            pd = xtset(df, :id, :t; desc="Test panel",
+                       vardesc=Dict("x" => "X variable"))
+            pd2 = apply_filter(pd, :hp; component=:cycle)
+            @test desc(pd2) == "Test panel"
+            @test vardesc(pd2, "x") == "X variable"
+            @test groups(pd2) == ["1", "2"]
+        end
+    end
+
+    # =========================================================================
+    # 14. source_refs field
     # =========================================================================
     @testset "source_refs" begin
         # Default is empty

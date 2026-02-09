@@ -168,6 +168,17 @@ include("teststat/model_comparison.jl")
 # Granger causality tests
 include("teststat/granger.jl")
 
+# Panel VAR
+include("pvar/types.jl")
+include("pvar/transforms.jl")
+include("pvar/instruments.jl")
+include("pvar/estimation.jl")
+include("pvar/analysis.jl")
+include("pvar/bootstrap.jl")
+include("teststat/pvar_hansen_j.jl")
+include("teststat/pvar_mmsc.jl")
+include("teststat/pvar_lag_selection.jl")
+
 # Covariance estimators
 include("core/covariance.jl")
 
@@ -198,6 +209,9 @@ include("summary.jl")
 
 # Data conversion and estimation dispatch wrappers (after all estimation functions)
 include("data/convert.jl")
+
+# Data filtering (after convert.jl, needs to_vector + all filter functions + group_data)
+include("data/filter.jl")
 
 # =============================================================================
 # Exports - Types
@@ -411,6 +425,26 @@ export estimate_gmm, gmm_objective, gmm_summary
 export optimal_weighting_matrix, identity_weighting
 export j_test, numerical_gradient
 export estimate_lp_gmm, lp_gmm_moments
+export linear_gmm_solve, gmm_sandwich_vcov, andrews_lu_mmsc
+
+# =============================================================================
+# Exports - Panel VAR
+# =============================================================================
+
+# Types
+export PVARModel, PVARStability, PVARTestResult
+
+# Estimation
+export estimate_pvar, estimate_pvar_feols
+
+# Analysis
+export pvar_oirf, pvar_girf, pvar_fevd, pvar_stability
+
+# Bootstrap
+export pvar_bootstrap_irf
+
+# Specification tests
+export pvar_hansen_j, pvar_mmsc, pvar_lag_selection
 
 # =============================================================================
 # Exports - ARIMA Models
@@ -533,7 +567,7 @@ export xtset, isbalanced, groups, ngroups, group_data, panel_summary
 export DataDiagnostic, diagnose, fix, validate_for_model
 
 # Transformations
-export apply_tcode, inverse_tcode
+export apply_tcode, inverse_tcode, apply_filter
 
 # Summary statistics
 export DataSummary, describe_data

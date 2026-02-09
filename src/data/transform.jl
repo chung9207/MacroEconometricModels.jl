@@ -126,6 +126,69 @@ function apply_tcode(d::TimeSeriesData, tcode::Int)
 end
 
 # =============================================================================
+# PanelData apply_tcode (group-by-group)
+# =============================================================================
+
+"""
+    apply_tcode(d::PanelData, tcodes::Vector{Int}) -> PanelData
+
+Apply per-variable FRED transformation codes to a `PanelData` container,
+processing each group independently. Each group is trimmed to its own
+common length after transformation, then reassembled.
+
+# Examples
+```julia
+pd = xtset(df, :id, :t)
+pd2 = apply_tcode(pd, [5, 5, 1])  # log-diff first two vars, leave third in levels
+```
+"""
+function apply_tcode(d::PanelData{T}, tcodes::Vector{Int}) where {T}
+    n = d.n_vars
+    length(tcodes) != n && throw(ArgumentError(
+        "tcodes length ($(length(tcodes))) must match n_vars ($n)"))
+
+    # Transform each group independently
+    group_datas = Vector{TimeSeriesData}(undef, d.n_groups)
+    for g in 1:d.n_groups
+        gd = group_data(d, g)
+        group_datas[g] = apply_tcode(gd, tcodes)
+    end
+
+    # Reassemble into PanelData
+    total_rows = sum(nobs(gd) for gd in group_datas)
+    new_data = Matrix{Float64}(undef, total_rows, n)
+    new_group_id = Vector{Int}(undef, total_rows)
+    new_time_id = Vector{Int}(undef, total_rows)
+
+    row = 1
+    for g in 1:d.n_groups
+        gd = group_datas[g]
+        nr = nobs(gd)
+        new_data[row:row+nr-1, :] = gd.data
+        new_group_id[row:row+nr-1] .= g
+        new_time_id[row:row+nr-1] = gd.time_index
+        row += nr
+    end
+
+    obs_per_group = [nobs(gd) for gd in group_datas]
+    balanced = all(==(obs_per_group[1]), obs_per_group)
+
+    PanelData{Float64}(new_data, copy(d.varnames), d.frequency, tcodes,
+                        new_group_id, new_time_id, copy(d.group_names),
+                        d.n_groups, n, total_rows, balanced,
+                        copy(d.desc), copy(d.vardesc), copy(d.source_refs))
+end
+
+"""
+    apply_tcode(d::PanelData, tcode::Int) -> PanelData
+
+Apply the same FRED transformation code to all variables in a PanelData container.
+"""
+function apply_tcode(d::PanelData, tcode::Int)
+    apply_tcode(d, fill(tcode, d.n_vars))
+end
+
+# =============================================================================
 # Inverse transformation
 # =============================================================================
 
