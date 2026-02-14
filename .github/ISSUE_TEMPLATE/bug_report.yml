@@ -1,0 +1,81 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug. Please fill out the sections below so we can reproduce and fix the issue.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear description of the bug.
+      placeholder: What happened? What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: mwe
+    attributes:
+      label: Minimal Reproducible Example
+      description: A short, self-contained Julia script that reproduces the issue.
+      render: julia
+      placeholder: |
+        using MacroEconometricModels
+        using Random; Random.seed!(42)
+
+        Y = randn(100, 3)
+        m = estimate_var(Y, 2)
+        # ... steps that trigger the bug
+    validations:
+      required: true
+
+  - type: textarea
+    id: stacktrace
+    attributes:
+      label: Error Message / Stacktrace
+      description: Paste the full error output if applicable.
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: versions
+    attributes:
+      label: Version Information
+      description: |
+        Paste the output of the following commands:
+        ```julia
+        versioninfo()
+        using Pkg; Pkg.status("MacroEconometricModels")
+        ```
+      render: text
+    validations:
+      required: true
+
+  - type: dropdown
+    id: module
+    attributes:
+      label: Affected Module
+      description: Which part of the package is affected?
+      multiple: true
+      options:
+        - VAR
+        - Bayesian VAR
+        - VECM
+        - Panel VAR
+        - Local Projections
+        - Factor Models
+        - ARIMA
+        - Filters (HP, Hamilton, BN, BK, Boosted HP)
+        - ARCH/GARCH/SV
+        - GMM
+        - Hypothesis Tests
+        - Non-Gaussian Identification
+        - Data Module
+        - Documentation
+        - Other
+    validations:
+      required: true
