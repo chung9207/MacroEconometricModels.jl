@@ -70,7 +70,11 @@ function main()
         end
 
         # Wide panel for factor models: ≤20 clean transformed series
-        X_all = to_matrix(apply_tcode(fred_md))
+        # Filter out variables whose tcode requires positive data (≥4) but contain non-positive values
+        safe_idx = [i for i in 1:nvars(fred_md)
+                    if fred_md.tcode[i] < 4 || all(x -> isfinite(x) && x > 0, fred_md.data[:, i])]
+        fred_safe = fred_md[:, varnames(fred_md)[safe_idx]]
+        X_all = to_matrix(apply_tcode(fred_safe))
         good_cols = [j for j in 1:size(X_all,2) if !any(isnan, X_all[:,j])]
         X20 = X_all[:, good_cols[1:min(20, length(good_cols))]]
 
@@ -210,7 +214,7 @@ function main()
     # -------------------------------------------------------------------
     # 22. SV posterior volatility
     # -------------------------------------------------------------------
-    sv_m = estimate_sv(y_vol; n_samples=2000, burnin=1000)
+    sv_m = estimate_sv(y_vol; n_samples=500, burnin=200)
     save("model_sv.html", plot_result(sv_m))
 
     # -------------------------------------------------------------------
