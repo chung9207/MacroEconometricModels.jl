@@ -414,6 +414,7 @@ report(x::StateTransition) = show(stdout, x)
 report(x::PropensityScoreConfig) = show(stdout, x)
 report(x::MinnesotaHyperparameters) = show(stdout, x)
 report(x::AriasSVARResult) = show(stdout, x)
+report(x::UhligSVARResult) = show(stdout, x)
 report(x::SVARRestrictions) = show(stdout, x)
 
 # =============================================================================
@@ -1562,6 +1563,41 @@ function Base.show(io::IO, r::AriasSVARResult)
     )
 end
 
+function Base.show(io::IO, r::UhligSVARResult)
+    n_zeros = length(r.restrictions.zeros)
+    n_signs = length(r.restrictions.signs)
+    n = r.restrictions.n_vars
+    horizon = size(r.irf, 1)
+    data = Any[
+        "Variables" n;
+        "Horizon" horizon;
+        "Zero restrictions" n_zeros;
+        "Sign restrictions" n_signs;
+        "Penalty" _fmt(r.penalty; digits=4);
+        "Converged" (r.converged ? "Yes" : "No")
+    ]
+    _pretty_table(io, data;
+        title = "Mountford-Uhlig (2009) SVAR Result",
+        column_labels = ["", ""],
+        alignment = [:l, :r],
+    )
+
+    # Per-shock penalty breakdown
+    shock_data = Matrix{Any}(undef, n, 3)
+    for j in 1:n
+        n_zeros_j = count(zr -> zr.shock == j, r.restrictions.zeros)
+        n_signs_j = count(sr -> sr.shock == j, r.restrictions.signs)
+        shock_data[j, 1] = "Shock $j"
+        shock_data[j, 2] = "$n_zeros_j zero, $n_signs_j sign"
+        shock_data[j, 3] = _fmt(r.shock_penalties[j]; digits=4)
+    end
+    _pretty_table(io, shock_data;
+        title = "Per-Shock Summary",
+        column_labels = ["Shock", "Restrictions", "Penalty"],
+        alignment = [:l, :l, :r],
+    )
+end
+
 function Base.show(io::IO, r::ZeroRestriction)
     print(io, "ZeroRestriction(var=$(r.variable), shock=$(r.shock), horizon=$(r.horizon))")
 end
@@ -1623,6 +1659,11 @@ const _REFERENCES = Dict{Symbol, _RefEntry}(
         title="Inference Based on Structural Vector Autoregressions Identified with Sign and Zero Restrictions: Theory and Applications",
         journal="Econometrica", volume="86", issue="2", pages="685--720",
         doi="10.3982/ECTA14468", isbn="", publisher="", entry_type=:article),
+    :mountford_uhlig2009 => (key=:mountford_uhlig2009,
+        authors="Mountford, Andrew and Uhlig, Harald", year=2009,
+        title="What Are the Effects of Fiscal Policy Shocks?",
+        journal="Journal of Applied Econometrics", volume="24", issue="6", pages="960--992",
+        doi="10.1002/jae.1079", isbn="", publisher="", entry_type=:article),
     :kilian1998 => (key=:kilian1998, authors="Kilian, Lutz", year=1998,
         title="Small-Sample Confidence Intervals for Impulse Response Functions",
         journal="Review of Economics and Statistics", volume="80", issue="2", pages="218--230",
@@ -1971,6 +2012,7 @@ const _TYPE_REFS = Dict{Symbol, Vector{Symbol}}(
     :HistoricalDecomposition => [:kilian_lutkepohl2017],
     :BayesianHistoricalDecomposition => [:kilian_lutkepohl2017],
     :AriasSVARResult => [:arias_rubio_ramirez_waggoner2018],
+    :UhligSVARResult => [:mountford_uhlig2009, :uhlig2005],
     :SVARRestrictions => [:arias_rubio_ramirez_waggoner2018],
     # Bayesian VAR
     :MinnesotaHyperparameters => [:litterman1986, :kadiyala_karlsson1997],
@@ -2298,6 +2340,7 @@ refs(io::IO, ::BayesianFEVD; kw...) = refs(io, _TYPE_REFS[:BayesianFEVD]; kw...)
 refs(io::IO, ::HistoricalDecomposition; kw...) = refs(io, _TYPE_REFS[:HistoricalDecomposition]; kw...)
 refs(io::IO, ::BayesianHistoricalDecomposition; kw...) = refs(io, _TYPE_REFS[:BayesianHistoricalDecomposition]; kw...)
 refs(io::IO, ::AriasSVARResult; kw...) = refs(io, _TYPE_REFS[:AriasSVARResult]; kw...)
+refs(io::IO, ::UhligSVARResult; kw...) = refs(io, _TYPE_REFS[:UhligSVARResult]; kw...)
 refs(io::IO, ::SVARRestrictions; kw...) = refs(io, _TYPE_REFS[:SVARRestrictions]; kw...)
 refs(io::IO, ::MinnesotaHyperparameters; kw...) = refs(io, _TYPE_REFS[:MinnesotaHyperparameters]; kw...)
 refs(io::IO, ::BVARPosterior; kw...) = refs(io, _TYPE_REFS[:BVARPosterior]; kw...)

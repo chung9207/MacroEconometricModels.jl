@@ -3,7 +3,7 @@ Structural identification: Cholesky, sign restrictions, narrative, long-run, Ari
 """
 
 using LinearAlgebra, Random, Statistics
-using SpecialFunctions: loggamma
+using Distributions: loggamma
 
 # =============================================================================
 # Cholesky Identification

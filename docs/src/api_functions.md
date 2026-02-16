@@ -176,6 +176,13 @@ Pages   = ["var/identification.jl"]
 Order   = [:function]
 ```
 
+### Mountford-Uhlig (2009) Penalty Function
+
+```@docs
+UhligSVARResult
+identify_uhlig
+```
+
 ---
 
 ## Innovation Accounting
