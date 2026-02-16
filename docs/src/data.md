@@ -621,6 +621,12 @@ for g in 1:ngroups(pd)
 end
 ```
 
+### See Also
+
+- [Time Series Filters](filters.md) -- HP, Hamilton, BN, BK, and boosted HP filters used by `apply_filter`
+- [Examples](examples.md) -- Complete worked examples including FRED-MD data pipeline
+- [API Reference](api_functions.md) -- Complete function signatures
+
 ## References
 
 - McCracken, Michael W., and Serena Ng. 2016. "FRED-MD: A Monthly Database for Macroeconomic Research." *Journal of Business & Economic Statistics* 34 (4): 574--589. [https://doi.org/10.1080/07350015.2015.1086655](https://doi.org/10.1080/07350015.2015.1086655)

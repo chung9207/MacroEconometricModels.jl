@@ -276,6 +276,53 @@ The acceptance rate indicates what fraction of random draws satisfy all restrict
 
 **Reference**: Arias, Rubio-Ramírez & Waggoner (2018)
 
+### Mountford-Uhlig (2009) Penalty Function Identification
+
+When you want a **single best rotation** rather than a distribution of draws, Mountford & Uhlig (2009) provide a penalty function approach. Zero restrictions are enforced exactly via null-space projection; sign restrictions are encouraged via a penalty function optimized with Nelder-Mead.
+
+**When to use**: Use `identify_uhlig` when you need one optimal ``Q`` satisfying sign (and optionally zero) restrictions. Use `identify_arias` when you need a distribution of valid ``Q`` matrices for credible intervals.
+
+**Algorithm**:
+1. Parameterize ``Q`` column-by-column using spherical coordinates in the null space of zero-restriction constraints
+2. Define penalty: ``-\sum_{s} w_s \cdot \text{sign}_s \cdot \text{IRF}_s / \sigma_s`` where ``w_s = 100`` if the sign is satisfied, ``w_s = 1`` if violated
+3. Minimize penalty via two-phase Nelder-Mead: coarse global search, then local refinement
+
+```julia
+using MacroEconometricModels
+using Random
+
+Random.seed!(42)
+Y = randn(200, 3)
+for t in 2:200; Y[t,:] = 0.5*Y[t-1,:] + 0.3*randn(3); end
+model = estimate_var(Y, 2)
+
+# Define restrictions (same types as Arias)
+restrictions = SVARRestrictions(3;
+    zeros = [zero_restriction(3, 1; horizon=0)],
+    signs = [sign_restriction(1, 1, :positive),
+             sign_restriction(2, 1, :positive)]
+)
+
+# Find optimal Q
+result = identify_uhlig(model, restrictions, 20)
+println("Converged: ", result.converged)
+println("Penalty: ", round(result.penalty, digits=2))
+println("Impact IRF(1→1): ", round(result.irf[1, 1, 1], digits=3))
+```
+
+### UhligSVARResult Return Values
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `Q` | `Matrix{T}` | Optimal rotation matrix |
+| `irf` | `Array{T,3}` | ``H \times n \times n`` impulse responses |
+| `penalty` | `T` | Total penalty at optimum (negative = better) |
+| `shock_penalties` | `Vector{T}` | Per-shock penalty values |
+| `restrictions` | `SVARRestrictions` | The imposed restrictions |
+| `converged` | `Bool` | Whether all sign restrictions are satisfied |
+
+**Reference**: Mountford & Uhlig (2009)
+
 ---
 
 ## Innovation Accounting
@@ -489,6 +536,14 @@ The lag selection criteria typically agree when the true DGP is low-order; BIC t
 
 ---
 
+### See Also
+
+- [VECM Analysis](vecm.md) -- Error correction models for cointegrated systems
+- [Local Projections](lp.md) -- Model-free impulse response estimation (Jorda 2005)
+- [Non-Gaussian Identification](nongaussian.md) -- ICA, ML, and heteroskedasticity-based SVAR identification
+- [Innovation Accounting](innovation_accounting.md) -- IRF, FEVD, and historical decomposition details
+- [API Reference](api_functions.md) -- Complete function signatures
+
 ## References
 
 ### Vector Autoregression
@@ -505,6 +560,7 @@ The lag selection criteria typically agree when the true DGP is low-order; BIC t
 - Blanchard, Olivier Jean, and Danny Quah. 1989. "The Dynamic Effects of Aggregate Demand and Supply Disturbances." *American Economic Review* 79 (4): 655–673.
 - Faust, Jon. 1998. "The Robustness of Identified VAR Conclusions about Money." *Carnegie-Rochester Conference Series on Public Policy* 49: 207–244. [https://doi.org/10.1016/S0167-2231(99)00009-3](https://doi.org/10.1016/S0167-2231(99)00009-3)
 - Kilian, Lutz, and Helmut Lütkepohl. 2017. *Structural Vector Autoregressive Analysis*. Cambridge: Cambridge University Press. [https://doi.org/10.1017/9781108164818](https://doi.org/10.1017/9781108164818)
+- Mountford, Andrew, and Harald Uhlig. 2009. "What Are the Effects of Fiscal Policy Shocks?" *Journal of Applied Econometrics* 24 (6): 960–992. [https://doi.org/10.1002/jae.1079](https://doi.org/10.1002/jae.1079)
 - Rubio-Ramírez, Juan F., Daniel F. Waggoner, and Tao Zha. 2010. "Structural Vector Autoregressions: Theory of Identification and Algorithms for Inference." *Review of Economic Studies* 77 (2): 665–696. [https://doi.org/10.1111/j.1467-937X.2009.00578.x](https://doi.org/10.1111/j.1467-937X.2009.00578.x)
 - Uhlig, Harald. 2005. "What Are the Effects of Monetary Policy on Output? Results from an Agnostic Identification Procedure." *Journal of Monetary Economics* 52 (2): 381–419. [https://doi.org/10.1016/j.jmoneco.2004.05.007](https://doi.org/10.1016/j.jmoneco.2004.05.007)
 

@@ -629,6 +629,12 @@ In this example, the GJR-GARCH model should provide the best fit (lowest AIC/BIC
 
 ---
 
+### See Also
+
+- [Hypothesis Tests](hypothesis_tests.md) -- ARCH-LM test and diagnostic testing
+- [ARIMA Models](arima.md) -- Mean equation modeling before volatility estimation
+- [API Reference](api_functions.md) -- Complete function signatures
+
 ## References
 
 - Black, Fischer. 1976. "Studies of Stock Price Volatility Changes." *Proceedings of the 1976 Meetings of the American Statistical Association*, 171–177.

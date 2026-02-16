@@ -9,6 +9,8 @@ The API documentation is organized into the following pages:
 
 ## Quick Reference Tables
 
+Typed data containers, built-in datasets (FRED-MD, FRED-QD, Penn World Table), and data cleaning utilities. See [Data Management](data.md) for theory and examples.
+
 ### Data Management
 
 | Function | Description |
@@ -30,6 +32,8 @@ The API documentation is organized into the following pages:
 | `rename_vars!(d, old => new)` | Rename variables |
 | `load_example(:fred_md)` / `load_example(:fred_qd)` / `load_example(:pwt)` | Load built-in datasets (FRED-MD, FRED-QD, PWT) |
 
+AR, MA, ARMA, and ARIMA model estimation with automatic order selection. See [ARIMA Models](arima.md) for estimation methods, forecasting, and model selection.
+
 ### ARIMA Estimation Functions
 
 | Function | Description |
@@ -43,6 +47,8 @@ The API documentation is organized into the following pages:
 | `auto_arima(y)` | Automatic ARIMA order selection |
 | `ic_table(y, max_p, max_q)` | Information criteria comparison table |
 
+Trend-cycle decomposition via HP, Hamilton, Beveridge-Nelson, Baxter-King, and boosted HP filters. See [Time Series Filters](filters.md) for theory and comparisons.
+
 ### Time Series Filters
 
 | Function | Description |
@@ -54,6 +60,8 @@ The API documentation is organized into the following pages:
 | `boosted_hp(y; stopping=:BIC, lambda=1600.0)` | Boosted HP filter (Phillips & Shi 2021) |
 | `trend(result)` | Extract trend component from filter result |
 | `cycle(result)` | Extract cyclical component from filter result |
+
+VAR, VECM, BVAR, Local Projections, Factor Models, and Panel VAR estimation. See [VAR](manual.md), [VECM](vecm.md), [BVAR](bayesian.md), [LP](lp.md), [Factor Models](factormodels.md), and [Panel VAR](pvar.md) for theory and examples.
 
 ### Multivariate Estimation Functions
 
@@ -80,6 +88,8 @@ The API documentation is organized into the following pages:
 | `granger_causality_vecm(vecm, cause, effect)` | VECM Granger causality test |
 | `forecast(vecm, h; ci_method=:none, ...)` | VECM forecast preserving cointegration |
 
+Impulse response functions, forecast error variance decomposition, historical decomposition, and 18+ structural identification methods. See [Innovation Accounting](innovation_accounting.md) and [Non-Gaussian Identification](nongaussian.md).
+
 ### Structural Analysis Functions
 
 | Function | Description |
@@ -91,6 +101,7 @@ The API documentation is organized into the following pages:
 | `identify_long_run(model)` | Blanchard-Quah identification |
 | `identify_narrative(model; ...)` | Narrative sign restrictions |
 | `identify_arias(model, restrictions, H; ...)` | Arias et al. (2018) sign + zero restrictions |
+| `identify_uhlig(model, restrictions, H; ...)` | Mountford-Uhlig (2009) penalty function sign + zero restrictions |
 | `identify_fastica(model; ...)` | FastICA SVAR identification |
 | `identify_jade(model; ...)` | JADE SVAR identification |
 | `identify_sobi(model; ...)` | SOBI SVAR identification |
@@ -114,12 +125,16 @@ The API documentation is organized into the following pages:
 | `cumulative_irf(lp_irfs)` | Cumulative IRF from LP impulse response |
 | `historical_decomposition(slp)` | Historical decomposition from structural LP |
 
+Direct multi-step forecasting from Local Projection models. See [Local Projections](lp.md) for estimation details.
+
 ### LP Forecasting Functions
 
 | Function | Description |
 |----------|-------------|
 | `forecast(lp, shock_path; ...)` | Direct multi-step LP forecast |
 | `forecast(slp, shock_idx, shock_path; ...)` | Structural LP conditional forecast |
+
+Augmented Dickey-Fuller, KPSS, Phillips-Perron, Zivot-Andrews, Ng-Perron, and Johansen cointegration tests. See [Hypothesis Tests](hypothesis_tests.md) for interpretation and examples.
 
 ### Unit Root Test Functions
 
@@ -135,6 +150,8 @@ The API documentation is organized into the following pages:
 | `unit_root_summary(y; ...)` | Run multiple tests with summary |
 | `test_all_variables(Y; ...)` | Apply test to all columns |
 
+Likelihood ratio (LR) and Lagrange multiplier (LM/score) tests for comparing nested models across ARIMA, VAR, and GARCH families. See [Hypothesis Tests](hypothesis_tests.md).
+
 ### Model Comparison Tests
 
 | Function | Description |
@@ -142,12 +159,16 @@ The API documentation is organized into the following pages:
 | `lr_test(m1, m2)` | Likelihood ratio test for nested models |
 | `lm_test(m1, m2)` | Lagrange multiplier (score) test for nested models |
 
+Pairwise and block Wald tests for Granger causality in VAR models. See [Hypothesis Tests](hypothesis_tests.md) for details.
+
 ### Granger Causality Tests
 
 | Function | Description |
 |----------|-------------|
 | `granger_test(model, cause, effect)` | Pairwise or block Granger causality test |
 | `granger_test_all(model)` | All-pairs pairwise Granger causality matrix |
+
+Convenience functions for extracting impulse responses from fitted LP models. See [Local Projections](lp.md).
 
 ### LP IRF Extraction
 
@@ -158,6 +179,8 @@ The API documentation is organized into the following pages:
 | `smooth_lp_irf(model; ...)` | Extract smoothed IRF |
 | `state_irf(model; ...)` | Extract state-dependent IRFs |
 | `propensity_irf(model; ...)` | Extract ATE impulse response |
+
+Static PCA, Dynamic Factor, and Generalized Dynamic Factor model estimation, forecasting, and selection criteria. See [Factor Models](factormodels.md).
 
 ### Factor Model Functions
 
@@ -183,6 +206,8 @@ The API documentation is organized into the following pages:
 | `loglikelihood(dfm)` | Log-likelihood (DFM only) |
 | `aic(dfm)` / `bic(dfm)` | Information criteria (DFM only) |
 
+Bayesian prior optimization, instrument strength tests, and Panel VAR specification tests. See [BVAR](bayesian.md) and [Panel VAR](pvar.md).
+
 ### Diagnostic Functions
 
 | Function | Description |
@@ -200,6 +225,8 @@ The API documentation is organized into the following pages:
 | `j_test(model)` | Hansen J-test for GMM |
 | `gmm_summary(model)` | Summary statistics for GMM |
 
+Multivariate normality tests for VAR residuals. See [Non-Gaussian Identification](nongaussian.md) for using these as pre-tests for ICA/ML identification.
+
 ### Normality Test Functions
 
 | Function | Description |
@@ -210,6 +237,8 @@ The API documentation is organized into the following pages:
 | `henze_zirkler_test(model)` | Henze-Zirkler characteristic function test |
 | `normality_test_suite(model)` | Run all normality tests |
 
+Diagnostic tests for non-Gaussian SVAR identification validity. See [Non-Gaussian Identification](nongaussian.md).
+
 ### Identifiability Test Functions
 
 | Function | Description |
@@ -219,6 +248,8 @@ The API documentation is organized into the following pages:
 | `test_shock_independence(result; ...)` | Test independence of recovered shocks |
 | `test_identification_strength(model; ...)` | Bootstrap identification strength test |
 | `test_overidentification(model, result; ...)` | Overidentification test |
+
+ARCH, GARCH, EGARCH, GJR-GARCH, and Stochastic Volatility estimation, forecasting, and diagnostics. See [Volatility Models](volatility.md).
 
 ### Volatility Model Functions
 
@@ -246,6 +277,8 @@ The API documentation is organized into the following pages:
 | `aic(m)` / `bic(m)` | Information criteria (ARCH/GARCH) |
 | `dof(m)` | Number of estimated parameters |
 
+Publication-quality tables, display backend switching, and bibliographic references. See [Examples](examples.md) for LaTeX and HTML export workflows.
+
 ### Display and Output Functions
 
 | Function | Description |
@@ -258,6 +291,8 @@ The API documentation is organized into the following pages:
 | `refs(model; format=...)` | Bibliographic references |
 | `refs(io, :method; format=...)` | References by method name |
 
+HAC (Newey-West), heteroskedasticity-robust (White), and panel-robust (Driscoll-Kraay) covariance estimators.
+
 ### Covariance Functions
 
 | Function | Description |
@@ -268,6 +303,8 @@ The API documentation is organized into the following pages:
 | `long_run_variance(x; ...)` | Long-run variance estimate |
 | `long_run_covariance(X; ...)` | Long-run covariance matrix |
 | `optimal_bandwidth_nw(residuals)` | Automatic bandwidth selection |
+
+Low-level matrix construction and numerical utilities used internally.
 
 ### Utility Functions
 

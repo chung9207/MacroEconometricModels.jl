@@ -65,6 +65,7 @@ const TEST_GROUPS = [
         "core/test_error_paths.jl",
         "core/test_internal_helpers.jl",
         "var/test_arias2018.jl",
+        "var/test_uhlig.jl",
     ]),
     # Group 7: Volatility models (ARCH/GARCH/SV — MCMC heavy)
     ("Volatility Models" => [
@@ -199,6 +200,10 @@ else
 
         @testset "Arias et al. (2018) SVAR Identification" begin
             include("var/test_arias2018.jl")
+        end
+
+        @testset "Mountford-Uhlig (2009) SVAR Identification" begin
+            include("var/test_uhlig.jl")
         end
 
         @testset "Local Projections" begin

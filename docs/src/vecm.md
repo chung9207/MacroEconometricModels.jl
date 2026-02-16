@@ -262,8 +262,15 @@ decomp = fevd(var_model, 20)
 
 ---
 
+### See Also
+
+- [VAR Estimation](manual.md) -- Reduced-form VAR and structural identification
+- [Hypothesis Tests](hypothesis_tests.md) -- Johansen cointegration test details and unit root tests
+- [Data Management](data.md) -- Built-in datasets and data transformations
+- [API Reference](api_functions.md) -- Complete function signatures
+
 ## References
 
-- Johansen, S. (1991). Estimation and Hypothesis Testing of Cointegration Vectors in Gaussian Vector Autoregressive Models. *Econometrica*, 59(6), 1551--1580.
-- Engle, R. F. & Granger, C. W. J. (1987). Co-Integration and Error Correction: Representation, Estimation, and Testing. *Econometrica*, 55(2), 251--276.
-- Lutkepohl, H. (2005). *New Introduction to Multiple Time Series Analysis*. Springer.
+- Johansen, Soren. 1991. "Estimation and Hypothesis Testing of Cointegration Vectors in Gaussian Vector Autoregressive Models." *Econometrica* 59 (6): 1551--1580. [https://doi.org/10.2307/2938278](https://doi.org/10.2307/2938278)
+- Engle, Robert F., and Clive W. J. Granger. 1987. "Co-Integration and Error Correction: Representation, Estimation, and Testing." *Econometrica* 55 (2): 251--276. [https://doi.org/10.2307/1913236](https://doi.org/10.2307/1913236)
+- Lutkepohl, Helmut. 2005. *New Introduction to Multiple Time Series Analysis*. Berlin: Springer. ISBN 978-3-540-40172-8.

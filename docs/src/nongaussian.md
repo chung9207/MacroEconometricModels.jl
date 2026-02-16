@@ -554,6 +554,13 @@ println("\nIRF size: ", size(irfs.values))
 
 ---
 
+### See Also
+
+- [VAR Estimation](manual.md) -- Reduced-form VAR and traditional identification methods
+- [Hypothesis Tests](hypothesis_tests.md) -- Normality tests for residual diagnostics
+- [Innovation Accounting](innovation_accounting.md) -- IRF, FEVD, and historical decomposition
+- [API Reference](api_functions.md) -- Complete function signatures
+
 ## References
 
 ### Multivariate Normality Tests

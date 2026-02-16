@@ -212,6 +212,7 @@ ZeroRestriction
 SignRestriction
 SVARRestrictions
 AriasSVARResult
+UhligSVARResult
 ```
 
 ---

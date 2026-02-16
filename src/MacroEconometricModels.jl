@@ -111,6 +111,7 @@ include("teststat/normality.jl")
 
 # Structural identification
 include("var/identification.jl")
+include("var/uhlig.jl")
 
 # Non-Gaussian identification
 include("nongaussian/ica.jl")
@@ -325,6 +326,9 @@ export ZeroRestriction, SignRestriction, SVARRestrictions, AriasSVARResult
 export identify_arias, identify_arias_bayesian
 export zero_restriction, sign_restriction
 export irf_percentiles, irf_mean
+
+# Mountford & Uhlig (2009) penalty function identification
+export UhligSVARResult, identify_uhlig
 
 # =============================================================================
 # Exports - IRF and FEVD

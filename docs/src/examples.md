@@ -9,10 +9,10 @@ This chapter provides comprehensive worked examples demonstrating the main funct
 | 1 | Time Series Filters | `hp_filter`, `hamilton_filter`, `beveridge_nelson`, `baxter_king`, `boosted_hp` | All 5 filters compared on simulated GDP |
 | 2 | ARIMA Models | `estimate_ar`, `estimate_arma`, `auto_arima`, `forecast` | AR, MA, ARMA estimation, order selection, forecasting |
 | 3 | Volatility Models | `estimate_garch`, `estimate_egarch`, `estimate_sv`, `news_impact_curve` | ARCH/GARCH/SV estimation, diagnostics, forecasting |
-| 4 | Three-Variable VAR | `estimate_var`, `irf`, `fevd` | Frequentist VAR with Cholesky and sign restriction identification |
+| 4 | Three-Variable VAR | `estimate_var`, `irf`, `fevd`, `identify_arias` | Frequentist VAR with Cholesky, sign, long-run, and Arias (2018) identification |
 | 5 | Bayesian VAR with Minnesota Prior | `estimate_bvar`, `optimize_hyperparameters` | Minnesota prior, conjugate posterior estimation, credible intervals |
 | 6 | VECM Analysis | `estimate_vecm`, `johansen_test`, `to_var`, `forecast` | Cointegration, VECM estimation, IRF, forecast |
-| 7 | Local Projections | `estimate_lp`, `estimate_lp_iv`, `estimate_smooth_lp` | Standard, IV, smooth, and state-dependent LP |
+| 7 | Local Projections | `estimate_lp`, `estimate_lp_iv`, `structural_lp`, `lp_fevd` | Standard, IV, smooth, state-dependent, structural LP, and LP-FEVD |
 | 8 | Factor Model for Large Panels | `estimate_factors`, `ic_criteria`, `forecast` | Large panel factor extraction, Bai-Ng criteria, forecasting with CIs |
 | 9 | GMM Estimation | `estimate_gmm`, `j_test` | IV regression via GMM, overidentification test |
 | 10 | Non-Gaussian Identification | `identify_fastica`, `normality_test_suite`, `test_shock_gaussianity` | ICA, ML, heteroskedastic identification |
@@ -20,6 +20,8 @@ This chapter provides comprehensive worked examples demonstrating the main funct
 | 12 | Complete Workflow | Multiple | Unit roots → lag selection → VAR → BVAR → LP comparison |
 | 13 | Table Output (LaTeX & HTML) | `set_display_backend`, `print_table`, `table` | Export tables for papers, slides, and web |
 | 14 | Bibliographic References | `refs` | Multi-format references for models and methods |
+| 15 | Panel VAR Analysis | `estimate_pvar`, `pvar_oirf`, `pvar_fevd`, `pvar_bootstrap_irf` | Full PVAR workflow: GMM, specification tests, structural analysis |
+| 16 | FRED-MD Data Pipeline | `load_example`, `apply_tcode`, `diagnose`, `estimate_var` | Real data workflow from FRED-MD to VAR estimation |
 
 ---
 
@@ -367,6 +369,46 @@ end
 
 The FEVD shows the proportion of each variable's forecast error variance attributable to each structural shock. At short horizons, own shocks typically dominate. As the horizon increases, cross-variable transmission becomes more important, and the FEVD converges to the unconditional variance decomposition. If shock 1 explains a large share of GDP variance at long horizons, it is the primary driver of GDP fluctuations in the model.
 
+### Long-Run (Blanchard-Quah) Identification
+
+Long-run restrictions identify shocks by constraining their cumulative effects. The classic application distinguishes supply and demand shocks where demand shocks have no long-run effect on output.
+
+```julia
+using MacroEconometricModels, Random
+
+Random.seed!(42)
+Y = randn(200, 3)
+model = estimate_var(Y, 2)
+
+# Blanchard-Quah long-run identification
+irfs_lr = irf(model, 20; method=:long_run)
+```
+
+**Interpretation.** The long-run restriction forces the cumulative IRF of shock 1 on variable 2 to zero at the infinite horizon. This is implemented via the Blanchard-Quah decomposition of the long-run multiplier matrix. The method is particularly useful for bivariate supply-demand identification.
+
+### Arias et al. (2018) Zero and Sign Restrictions
+
+The Arias et al. (2018) algorithm provides a unified framework for imposing both zero and sign restrictions on impulse responses. It draws orthogonal rotation matrices uniformly conditional on the restrictions.
+
+```julia
+using MacroEconometricModels, Random
+
+Random.seed!(42)
+Y = randn(200, 3)
+model = estimate_var(Y, 2)
+
+# Define restrictions: shock 1 has positive effect on var 1, zero on var 3
+restrictions = SVARRestrictions(3)
+add_sign_restriction!(restrictions, 1, 1, :positive, 0)   # shock 1 → var 1 positive at h=0
+add_zero_restriction!(restrictions, 1, 3, 0)               # shock 1 → var 3 zero at h=0
+
+# Arias identification (draws uniform rotations conditional on restrictions)
+result = identify_arias(model, restrictions, 20; n_draws=500)
+irfs_arias = irf(model, 20; method=:arias, restrictions=restrictions, n_draws=500)
+```
+
+**Interpretation.** The Arias algorithm guarantees draws from the correct posterior over the identified set, unlike accept-reject approaches. The zero restriction imposes exact equality while sign restrictions constrain the sign at specified horizons. Report the median and pointwise credible bands from the accepted draws.
+
 ---
 
 ## Example 5: Bayesian VAR with Minnesota Prior
@@ -637,6 +679,50 @@ println("\nJoint test for regime differences:")
 println("  Average |t|: ", round(diff_test.joint_test.avg_t_stat, digits=2))
 println("  p-value: ", round(diff_test.joint_test.p_value, digits=4))
 ```
+
+### Structural LP (Plagborg-Moller & Wolf 2021)
+
+Structural LP extends standard LP to jointly identify multiple shocks, enabling direct comparison with VAR-based IRFs. The `structural_lp` function estimates impulse responses for all shocks simultaneously.
+
+```julia
+using MacroEconometricModels, Random
+
+Random.seed!(42)
+Y = randn(200, 3)
+
+# Structural LP with Cholesky identification
+slp = structural_lp(Y, 20; method=:cholesky, lags=4)
+
+# Multi-shock IRFs: response of variable 2 to shock 1
+slp.irfs[1, 2, :]  # H+1 vector of responses
+
+# Historical decomposition from structural LP
+hd = historical_decomposition(slp)
+```
+
+**Interpretation.** Structural LP produces IRFs that are asymptotically equivalent to VAR-based IRFs under correct specification (Plagborg-Moller and Wolf 2021). The key advantage is robustness to lag length misspecification. Use `structural_lp` when you want multi-shock identification without committing to a specific VAR lag order.
+
+### LP-FEVD (Gorodnichenko & Lee 2019)
+
+LP-FEVD decomposes forecast error variance using local projection methods, providing a model-free alternative to VAR-based FEVD.
+
+```julia
+using MacroEconometricModels, Random
+
+Random.seed!(42)
+Y = randn(200, 3)
+
+# First estimate structural LP
+slp = structural_lp(Y, 20; method=:cholesky, lags=4)
+
+# LP-FEVD with R² estimator
+lfevd = lp_fevd(slp; estimator=:r2)
+
+# Decomposition at horizon h: fraction of variable j's forecast error due to shock i
+lfevd.decomposition  # (H+1) × n_shocks × n_vars array
+```
+
+**Interpretation.** The R² estimator measures the fraction of h-step-ahead forecast error variance attributable to each structural shock. Unlike VAR-FEVD, LP-FEVD does not require invertibility of the MA representation and is robust to lag truncation. The decomposition should sum to approximately 1 across shocks at each horizon. See [Innovation Accounting](innovation_accounting.md) for a detailed comparison of VAR-FEVD and LP-FEVD.
 
 ---
 
@@ -1975,3 +2061,157 @@ The `refs()` function covers all 45+ references in the package's database, inclu
 4. **LaTeX export**: Use `set_display_backend(:latex)` then `print_table(io, ...)` for paper-ready tables
 5. **HTML export**: Use `set_display_backend(:html)` for Jupyter notebooks and web reports
 6. **Raw data**: Use `table(result, ...)` to extract matrices for custom formatting or CSV export
+
+---
+
+## Example 15: Panel VAR Analysis
+
+This example demonstrates the full Panel VAR workflow: data construction, lag selection, GMM estimation, specification tests, structural analysis, and bootstrap confidence intervals. See [Panel VAR](pvar.md) for theory and method details.
+
+```julia
+using MacroEconometricModels, DataFrames, Random
+
+Random.seed!(42)
+
+# --- Step 1: Construct panel data ---
+N, T_total, m = 50, 20, 3
+data = zeros(N * T_total, m)
+for i in 1:N
+    mu_i = randn(m)
+    for t in 2:T_total
+        idx = (i-1)*T_total + t
+        data[idx, :] = mu_i + 0.5 * data[(i-1)*T_total + t - 1, :] + 0.1 * randn(m)
+    end
+end
+df = DataFrame(data, ["y1", "y2", "y3"])
+df.id = repeat(1:N, inner=T_total)
+df.time = repeat(1:T_total, outer=N)
+pd = xtset(df, :id, :time)
+```
+
+### Lag Selection
+
+```julia
+# Andrews-Lu MMSC-based lag selection (max 4 lags)
+lag_result = pvar_lag_selection(pd, 4)
+```
+
+**Interpretation.** The lag selection procedure computes MMSC-AIC, MMSC-BIC, and MMSC-HQIC for each candidate lag length. Lower values indicate better fit-complexity trade-off. Choose the lag minimizing BIC for a conservative choice.
+
+### Two-Step GMM Estimation
+
+```julia
+# Estimate PVAR with two-step GMM and Windmeijer correction
+model = estimate_pvar(pd, 2; steps=:twostep)
+```
+
+### Specification Tests
+
+```julia
+# Hansen J-test for overidentifying restrictions
+j = pvar_hansen_j(model)
+
+# Andrews-Lu MMSC for moment selection
+mmsc = pvar_mmsc(model)
+
+# Stability check (all eigenvalues inside unit circle)
+stab = pvar_stability(model)
+```
+
+**Interpretation.** A non-rejected Hansen J-test (large p-value) supports the validity of the instruments. The MMSC criteria help select among alternative moment conditions. All eigenvalues of the companion matrix should be inside the unit circle for the PVAR to be stable.
+
+### Structural Analysis
+
+```julia
+# Orthogonalized IRF (Cholesky identification)
+irfs = pvar_oirf(model, 10)
+
+# Generalized IRF (order-invariant, Pesaran & Shin 1998)
+girfs = pvar_girf(model, 10)
+
+# Forecast error variance decomposition
+fv = pvar_fevd(model, 10)
+```
+
+### Bootstrap Confidence Intervals
+
+```julia
+# Group-level block bootstrap for IRF confidence intervals
+boot_irfs = pvar_bootstrap_irf(model, 10; n_draws=200)
+```
+
+**Interpretation.** The bootstrap resamples entire cross-sectional units (groups) to preserve within-unit dependence. With N=50 groups and 200 draws, the resulting confidence intervals account for both estimation uncertainty and cross-sectional heterogeneity. Report median IRFs with 90% bootstrap bands.
+
+### Alternative Estimators
+
+```julia
+# Fixed-Effects OLS (within estimator)
+fe_model = estimate_pvar_feols(pd, 2)
+
+# System GMM (Blundell & Bond 1998)
+sys_model = estimate_pvar(pd, 2; steps=:twostep, system_instruments=true)
+```
+
+**Interpretation.** FE-OLS is consistent when T is large relative to N but suffers from Nickell bias in short panels. System GMM adds level equations with lagged differences as instruments, improving efficiency when the first-difference instruments are weak (near unit root). Compare coefficient estimates across estimators as a robustness check.
+
+---
+
+## Example 16: FRED-MD Data Pipeline
+
+This example demonstrates a complete empirical workflow using the built-in FRED-MD dataset: loading data, applying transformations, data cleaning, and VAR estimation. See [Data Management](data.md) for data container details and [Examples](examples.md) for additional workflows.
+
+```julia
+using MacroEconometricModels, Random
+
+Random.seed!(42)
+
+# --- Step 1: Load the FRED-MD dataset ---
+md = load_example(:fred_md)
+desc(md)                                # Dataset description and vintage info
+```
+
+### Explore the Dataset
+
+```julia
+# Variable descriptions
+vardesc(md, "INDPRO")                   # "IP Index"
+vardesc(md, "UNRATE")                   # "Civilian Unemployment Rate"
+vardesc(md, "CPIAUCSL")                 # "CPI: All Items"
+
+# Bibliographic reference
+refs(md)                                # McCracken & Ng (2016)
+```
+
+### Transform and Clean
+
+```julia
+# Apply recommended FRED transformation codes (log-diff, diff, etc.)
+md_transformed = apply_tcode(md, md.tcode)
+
+# Diagnose data issues (NaN from differencing, constant columns, etc.)
+diag = diagnose(md_transformed)
+
+# Clean: remove rows with missing values
+clean = fix(md_transformed; method=:listwise)
+```
+
+**Interpretation.** The FRED transformation codes ensure stationarity: code 1 = no transform, 2 = first difference, 4 = log, 5 = log first difference, etc. Differencing introduces NaN in the first row(s), which `fix` removes. Always diagnose before estimation to catch remaining data issues.
+
+### Subset and Estimate
+
+```julia
+# Select 4 key macroeconomic variables
+subset = clean[:, ["INDPRO", "UNRATE", "CPIAUCSL", "FEDFUNDS"]]
+
+# Summary statistics
+describe_data(subset)
+
+# Estimate VAR(4) — quarterly lag structure for monthly data
+model = estimate_var(subset, 4)
+
+# Structural analysis
+irfs = irf(model, 24; method=:cholesky)     # 24-month horizon
+fvd = fevd(model, 24)
+```
+
+**Interpretation.** The four-variable system captures industrial production, unemployment, inflation, and monetary policy --- the core variables for monetary VAR analysis. With monthly data, 4 lags covers one quarter of dynamics. The Cholesky ordering places slow-moving real variables first and the policy rate last, consistent with the standard recursive identification in monetary economics. The impulse responses trace the transmission of a monetary policy shock through output, unemployment, and prices.
