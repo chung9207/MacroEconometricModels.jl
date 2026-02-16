@@ -1,5 +1,6 @@
 # Generated documentation
 docs/build/
+docs/src/assets/plots/
 
 # macOS system files
 .DS_Store
