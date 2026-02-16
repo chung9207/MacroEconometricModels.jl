@@ -33,7 +33,7 @@
 
 **Structural Identification** (18+ methods)
 
-- Cholesky, sign restrictions, long-run (Blanchard-Quah), narrative restrictions, Arias et al. (2018)
+- Cholesky, sign restrictions, long-run (Blanchard-Quah), narrative restrictions, Arias et al. (2018), Mountford-Uhlig (2009) penalty function
 - Non-Gaussian ICA: FastICA, JADE, SOBI, dCov, HSIC
 - Non-Gaussian ML: Student-t, mixture-normal, PML, skew-normal
 - Heteroskedasticity-based: Markov-switching, GARCH, smooth-transition, external volatility
@@ -61,7 +61,7 @@
 
 - Display backends: switchable text, LaTeX, and HTML table output via `set_display_backend()`
 - Publication-quality tables: `report()`, `table()`, `print_table()`
-- Bibliographic references: `refs(model)` in AEA text, BibTeX, LaTeX, or HTML format (59 entries)
+- Bibliographic references: `refs(model)` in AEA text, BibTeX, LaTeX, or HTML format (209 entries)
 
 ## Installation
 
@@ -333,6 +333,7 @@ Throughout this documentation, we use the following notation conventions:
 - Lutkepohl, Helmut. 2005. *New Introduction to Multiple Time Series Analysis*. Berlin: Springer. ISBN 978-3-540-40172-8.
 - Sims, Christopher A. 1980. "Macroeconomics and Reality." *Econometrica* 48 (1): 1--48. [https://doi.org/10.2307/1912017](https://doi.org/10.2307/1912017)
 - Arias, Jonas E., Juan F. Rubio-Ramirez, and Daniel F. Waggoner. 2018. "Inference Based on Structural Vector Autoregressions Identified with Sign and Zero Restrictions: Theory and Applications." *Econometrica* 86 (2): 685--720. [https://doi.org/10.3982/ECTA14468](https://doi.org/10.3982/ECTA14468)
+- Mountford, Andrew, and Harald Uhlig. 2009. "What Are the Effects of Fiscal Policy Shocks?" *Journal of Applied Econometrics* 24 (6): 960--992. [https://doi.org/10.1002/jae.1079](https://doi.org/10.1002/jae.1079)
 
 ### Bayesian Methods
 

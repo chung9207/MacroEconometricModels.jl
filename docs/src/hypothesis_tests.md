@@ -933,6 +933,13 @@ lm_test(arch1, garch11)     # LM supports ARCH→GARCH nesting
 
 ---
 
+### See Also
+
+- [VAR Estimation](manual.md) -- Pre-estimation diagnostics and lag selection
+- [VECM Analysis](vecm.md) -- Johansen cointegration testing in the VECM context
+- [Volatility Models](volatility.md) -- ARCH-LM test applications for volatility modeling
+- [API Reference](api_functions.md) -- Complete function signatures
+
 ## Reference
 
 ### Result Types

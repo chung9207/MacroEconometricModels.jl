@@ -65,12 +65,11 @@ A comprehensive Julia package for macroeconomic time series analysis. Provides V
 - **Linear GMM** - Closed-form solver for panel IV estimation
 - **Sandwich covariance** - Robust GMM variance with Windmeijer correction
 
-### Structural Identification
-- Cholesky decomposition (recursive)
-- Sign restrictions (Rubio-Ramirez, Waggoner & Zha 2010)
-- Narrative restrictions (Antolin-Diaz & Rubio-Ramirez 2018)
-- Long-run restrictions (Blanchard & Quah 1989)
-- Arias, Rubio-Ramirez & Waggoner (2018) algorithm for zero and sign restrictions
+### Structural Identification (18+ methods)
+- **Traditional**: Cholesky (recursive), sign restrictions (Rubio-Ramirez et al. 2010), narrative restrictions (Antolin-Diaz & Rubio-Ramirez 2018), long-run (Blanchard & Quah 1989), zero+sign (Arias et al. 2018), penalty function (Mountford & Uhlig 2009)
+- **Non-Gaussian ICA**: FastICA, JADE, SOBI, distance covariance, HSIC
+- **Non-Gaussian ML**: Student-t, mixture-normal, pseudo-ML, skew-normal
+- **Heteroskedasticity**: Markov-switching, GARCH, smooth-transition, external volatility
 
 ### Innovation Accounting
 - **Impulse Response Functions (IRF)** - Bootstrap, theoretical, and Bayesian credible intervals
@@ -249,6 +248,12 @@ using MacroEconometricModels
 
 Y = randn(200, 3)
 lp_result = estimate_lp(Y, 1, 20; cov_type=:newey_west)
+```
+
+```julia
+# Structural LP with multi-shock IRFs (Plagborg-Moller & Wolf 2021)
+slp = structural_lp(Y, 20; method=:cholesky, lags=4)
+lfevd = lp_fevd(slp; estimator=:r2)  # LP-FEVD decomposition
 ```
 
 ### Factor Model Forecasting
@@ -433,6 +438,7 @@ Full documentation available at [https://chung9207.github.io/MacroEconometricMod
 
 - Arias, Jonas E., Juan F. Rubio-Ramírez, and Daniel F. Waggoner. 2018. "Inference Based on Structural Vector Autoregressions Identified with Sign and Zero Restrictions: Theory and Applications." *Econometrica* 86 (2): 685–720. [https://doi.org/10.3982/ECTA14468](https://doi.org/10.3982/ECTA14468)
 - Antolín-Díaz, Juan, and Juan F. Rubio-Ramírez. 2018. "Narrative Sign Restrictions for SVARs." *American Economic Review* 108 (10): 2802–2829. [https://doi.org/10.1257/aer.20161852](https://doi.org/10.1257/aer.20161852)
+- Mountford, Andrew, and Harald Uhlig. 2009. "What Are the Effects of Fiscal Policy Shocks?" *Journal of Applied Econometrics* 24 (6): 960–992. [https://doi.org/10.1002/jae.1079](https://doi.org/10.1002/jae.1079)
 - Blanchard, Olivier Jean, and Danny Quah. 1989. "The Dynamic Effects of Aggregate Demand and Supply Disturbances." *American Economic Review* 79 (4): 655–673.
 - Kilian, Lutz, and Helmut Lütkepohl. 2017. *Structural Vector Autoregressive Analysis*. Cambridge: Cambridge University Press. [https://doi.org/10.1017/9781108164818](https://doi.org/10.1017/9781108164818)
 - Lütkepohl, Helmut. 2005. *New Introduction to Multiple Time Series Analysis*. Berlin: Springer. ISBN 978-3-540-40172-8.

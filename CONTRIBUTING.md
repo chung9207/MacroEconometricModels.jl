@@ -50,6 +50,44 @@ julia --project=. -e 'using Pkg; Pkg.instantiate()'
 - New models should include: types in `types.jl`, estimation, analysis functions, tests, and a documentation page
 - Keep PRs focused — one feature or fix per PR
 
+### Test Architecture
+
+The test suite contains ~7,739 tests organized into 7 parallel groups (run by default):
+
+| Group | Contents |
+|-------|----------|
+| **Core & Bayesian** | core/{aqua,coverage_gaps}, var/core_var, bvar/{bayesian,samplers,utils,minnesota,bgr} |
+| **IRF & FEVD + PVAR** | var/{irf,irf_ci,statsapi,fevd,hd}, core/summary, vecm/test_vecm, pvar/test_pvar |
+| **Factor Models** | factor/{factormodel,dynamicfactormodel,gdfm,factor_forecast} |
+| **Local Projections** | lp/{lp,lp_structural,lp_forecast,lp_fevd} |
+| **ARIMA & Utilities** | teststat/unitroot, arima/{arima,arima_coverage}, core/{utils,edge_cases,examples}, gmm/gmm, core/covariance, filters/filters, teststat/{model_comparison,granger}, data/test_data |
+| **Non-Gaussian & Display** | teststat/normality, nongaussian/{svar,internals}, core/{display_backends,error_paths,internal_helpers}, var/{arias2018,uhlig} |
+| **Volatility** | volatility/{volatility,volatility_coverage} — bottleneck group (SV Gibbs sampler) |
+
+For sequential execution (useful for debugging):
+```bash
+MACRO_SERIAL_TESTS=1 julia --project=. -e 'using Pkg; Pkg.test()'
+```
+
+### Code Architecture
+
+Key conventions to follow when contributing:
+
+- **Include order matters**: Source files have strict dependency ordering in `MacroEconometricModels.jl` — see `CLAUDE.md` for the full chain
+- **`@float_fallback` macro**: Generates `Float64` conversion methods for `AbstractMatrix` arguments. Write manual fallbacks for `AbstractVector` inputs
+- **Optim qualification**: `Optim` is `import`ed, not `using`; always qualify calls as `Optim.optimize`, `Optim.LBFGS()`, etc.
+- **Numerical safety**: Use `robust_inv(A)` instead of `inv(A)`, `safe_cholesky(A)` instead of `cholesky(A)`
+- **Internal helpers**: Prefix with `_` (e.g., `_unpack_arma_params`, `_numerical_hessian`)
+- **Type parameters**: Use `T<:AbstractFloat` throughout; accept `AbstractMatrix`/`AbstractVector` in public APIs
+- **Variable naming**: Never use `eps` (shadows `Base.eps`) — use `resid` instead
+
+### Branch Workflow
+
+- Development happens on the `dev` branch
+- Pull requests target `main`
+- Always run the full test suite before submitting a PR
+- The CI pipeline runs on Ubuntu, macOS, and Windows with Julia 1.12+
+
 ### Running Documentation Locally
 
 ```bash

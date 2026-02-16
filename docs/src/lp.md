@@ -956,6 +956,13 @@ with ``V^{LP} \geq V^{VAR}`` (VAR is weakly more efficient).
 
 ---
 
+### See Also
+
+- [VAR Estimation](manual.md) -- VAR-based impulse responses for comparison with LP estimates
+- [Innovation Accounting](innovation_accounting.md) -- LP-FEVD and structural decomposition details
+- [Hypothesis Tests](hypothesis_tests.md) -- Unit root and Granger causality tests
+- [API Reference](api_functions.md) -- Complete function signatures
+
 ## References
 
 ### Local Projections - Core

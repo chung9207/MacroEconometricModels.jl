@@ -536,6 +536,14 @@ The lag selection criteria typically agree when the true DGP is low-order; BIC t
 
 ---
 
+### See Also
+
+- [VECM Analysis](vecm.md) -- Error correction models for cointegrated systems
+- [Local Projections](lp.md) -- Model-free impulse response estimation (Jorda 2005)
+- [Non-Gaussian Identification](nongaussian.md) -- ICA, ML, and heteroskedasticity-based SVAR identification
+- [Innovation Accounting](innovation_accounting.md) -- IRF, FEVD, and historical decomposition details
+- [API Reference](api_functions.md) -- Complete function signatures
+
 ## References
 
 ### Vector Autoregression
