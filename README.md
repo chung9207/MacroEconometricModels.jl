@@ -65,19 +65,7 @@ A comprehensive Julia package for macroeconomic time series analysis. Provides V
 - **Linear GMM** - Closed-form solver for panel IV estimation
 - **Sandwich covariance** - Robust GMM variance with Windmeijer correction
 
-### Nowcasting
-- **Dynamic Factor Model (DFM)** - EM algorithm with Kalman smoother for mixed-frequency data (Banbura & Modugno 2014)
-  - Arbitrary missing patterns and ragged edges
-  - Mariano-Murasawa [1 2 3 2 1] temporal aggregation for quarterly variables
-  - Block factor structure, AR(1)/IID idiosyncratic components
-- **Large Bayesian VAR** - GLP-style Normal-Inverse-Wishart prior (Cimadomo et al. 2022)
-  - Hyperparameter optimization via marginal log-likelihood maximization
-  - Minnesota shrinkage with sum-of-coefficients and co-persistence priors
-- **Bridge Equations** - OLS regressions combining pairs of monthly indicators via median (Banbura et al. 2023)
-- **News Decomposition** - Attribute nowcast revisions to individual data releases
-- **Panel Balancing** - `balance_panel()` fills NaN in TimeSeriesData/PanelData using DFM imputation
-
-### Structural Identification (18+ methods)
+### Structural Identification
 - **Traditional**: Cholesky (recursive), sign restrictions (Rubio-Ramirez et al. 2010), narrative restrictions (Antolin-Diaz & Rubio-Ramirez 2018), long-run (Blanchard & Quah 1989), zero+sign (Arias et al. 2018), penalty function (Mountford & Uhlig 2009)
 - **Non-Gaussian ICA**: FastICA, JADE, SOBI, distance covariance, HSIC
 - **Non-Gaussian ML**: Student-t, mixture-normal, pseudo-ML, skew-normal
@@ -91,6 +79,18 @@ A comprehensive Julia package for macroeconomic time series analysis. Provides V
 - **Summary Tables** - Publication-quality output with `report()`, `table()`, `print_table()`
 - **Display Backends** - Switch between text, LaTeX, and HTML table output with `set_display_backend()`
 - **Bibliographic References** - `refs(model)` outputs AEA-style citations in text, LaTeX, BibTeX, or HTML
+
+### Nowcasting
+- **Dynamic Factor Model (DFM)** - EM algorithm with Kalman smoother for mixed-frequency data (Banbura & Modugno 2014)
+  - Arbitrary missing patterns and ragged edges
+  - Mariano-Murasawa [1 2 3 2 1] temporal aggregation for quarterly variables
+  - Block factor structure, AR(1)/IID idiosyncratic components
+- **Large Bayesian VAR** - GLP-style Normal-Inverse-Wishart prior (Cimadomo et al. 2022)
+  - Hyperparameter optimization via marginal log-likelihood maximization
+  - Minnesota shrinkage with sum-of-coefficients and co-persistence priors
+- **Bridge Equations** - OLS regressions combining pairs of monthly indicators via median (Banbura et al. 2023)
+- **News Decomposition** - Attribute nowcast revisions to individual data releases
+- **Panel Balancing** - `balance_panel()` fills NaN in TimeSeriesData/PanelData using DFM imputation
 
 ### Non-Gaussian Identification
 - **Heteroskedasticity-based** - Markov-switching, GARCH, smooth-transition, external volatility
