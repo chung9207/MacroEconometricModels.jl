@@ -17,14 +17,17 @@
 # along with MacroEconometricModels.jl. If not, see <https://www.gnu.org/licenses/>.
 
 """
-Shared helper functions for non-Gaussian SVAR identification.
+Shared helper functions for statistical SVAR identification via higher moments (Lewis 2025).
 
-These utilities are used across the ICA, ML, and heteroskedastic
+These utilities are used across non-Gaussianity (ICA, ML) and heteroskedasticity-based
 identification methods:
 - `_whiten`: PCA-based pre-whitening
 - `_givens_to_orthogonal` / `_orthogonal_to_givens`: rotation parameterization
 - `_ica_to_svar`: convert ICA unmixing to structural form
 - `_eigendecomposition_id`: heteroskedasticity-based identification
+
+References:
+- Lewis, D. J. (2025). "Identification based on higher moments in macroeconometrics."
 """
 
 using LinearAlgebra, Statistics

@@ -19,12 +19,15 @@
 """
 Non-Gaussian maximum likelihood SVAR identification.
 
+Parametric identification via non-Gaussianity (Lewis 2025, Section 4).
 Estimates B₀ and distribution parameters jointly by maximizing the log-likelihood
 under non-Gaussian shock distributions: Student-t, mixture of normals, PML (Pearson Type IV),
 skew-normal, or a unified dispatcher.
 
 References:
+- Lewis, D. J. (2025). "Identification based on higher moments in macroeconometrics."
 - Lanne, M., Meitz, M. & Saikkonen, P. (2017). "Identification and estimation of non-Gaussian SVAR."
+- Gourieroux, C., Monfort, A. & Renne, J.-P. (2017). "Statistical inference for independent component analysis."
 - Lanne, M. & Lütkepohl, H. (2010). "Structural VAR analysis in a data-rich environment."
 - Herwartz, H. (2018). "Hodges-Lehmann detection of structural shocks."
 - Azzalini, A. (1985). "A class of distributions which includes the normal ones."

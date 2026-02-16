@@ -17,12 +17,18 @@
 # along with MacroEconometricModels.jl. If not, see <https://www.gnu.org/licenses/>.
 
 """
-Identifiability and specification tests for non-Gaussian SVAR.
+Identifiability and specification tests for statistical SVAR identification.
 
-Tests whether non-Gaussian identification conditions hold, whether recovered shocks
-are non-Gaussian and independent, and model specification tests.
+Tests whether non-Gaussian / heteroskedasticity-based identification conditions hold,
+whether recovered shocks are non-Gaussian and independent, and model specification tests.
+
+Note: Weak identification is an important concern when variances change little or
+deviations from Gaussianity are small (Lewis 2022). Standard Wald tests may have
+poor size properties in such cases.
 
 References:
+- Lewis, D. J. (2025). "Identification based on higher moments in macroeconometrics."
+- Lewis, D. J. (2022). "Robust inference in models identified via heteroskedasticity."
 - Lanne, M., Meitz, M. & Saikkonen, P. (2017). "Identification and estimation of non-Gaussian SVAR."
 - Herwartz, H. & Plödt, M. (2016). "The macroeconomic effects of oil price shocks."
 """

@@ -67,9 +67,9 @@ A comprehensive Julia package for macroeconomic time series analysis. Provides V
 
 ### Structural Identification
 - **Traditional**: Cholesky (recursive), sign restrictions (Rubio-Ramirez et al. 2010), narrative restrictions (Antolin-Diaz & Rubio-Ramirez 2018), long-run (Blanchard & Quah 1989), zero+sign (Arias et al. 2018), penalty function (Mountford & Uhlig 2009)
-- **Non-Gaussian ICA**: FastICA, JADE, SOBI, distance covariance, HSIC
-- **Non-Gaussian ML**: Student-t, mixture-normal, pseudo-ML, skew-normal
-- **Heteroskedasticity**: Markov-switching, GARCH, smooth-transition, external volatility
+- **Heteroskedasticity-based**: Markov-switching, GARCH, smooth-transition, external volatility (Rigobon 2003, Lewis 2021)
+- **Non-Gaussian ICA**: FastICA, JADE, SOBI, distance covariance, HSIC (Hyvärinen et al. 2010)
+- **Non-Gaussian ML**: Student-t, mixture-normal, pseudo-ML, skew-normal (Lanne et al. 2017)
 
 ### Innovation Accounting
 - **Impulse Response Functions (IRF)** - Bootstrap, theoretical, and Bayesian credible intervals
@@ -92,13 +92,14 @@ A comprehensive Julia package for macroeconomic time series analysis. Provides V
 - **News Decomposition** - Attribute nowcast revisions to individual data releases
 - **Panel Balancing** - `balance_panel()` fills NaN in TimeSeriesData/PanelData using DFM imputation
 
-### Non-Gaussian Identification
-- **Heteroskedasticity-based** - Markov-switching, GARCH, smooth-transition, external volatility
-- **ICA-based methods** - FastICA, JADE, SOBI, distance covariance, HSIC
-- **Non-Gaussian ML** - Student-t, mixture-normal, pseudo-ML, skew-normal
+### Statistical Identification via Higher Moments
+- **Heteroskedasticity-based** - Markov-switching (Lanne & Lütkepohl 2008), GARCH (Normandin & Phaneuf 2004), smooth-transition (Lütkepohl & Netšunajev 2017), external volatility (Rigobon 2003)
+- **Non-Gaussian ICA** - FastICA, JADE, SOBI, distance covariance, HSIC (Hyvärinen et al. 2010, Matteson & Tsay 2017)
+- **Non-Gaussian ML** - Student-t, mixture-normal, pseudo-ML, skew-normal (Lanne et al. 2017, Gourieroux et al. 2017)
 - **Multivariate normality tests** - Jarque-Bera, Mardia, Doornik-Hansen, Henze-Zirkler
-- **Identifiability diagnostics** - Shock gaussianity, LR tests, independence tests, bootstrap strength tests
+- **Identifiability diagnostics** - Shock gaussianity, independence, identification strength, LR tests
 - Seamless integration: `irf(model, 20; method=:fastica)` works out of the box
+- See Lewis (2025) for a comprehensive review
 
 ### Hypothesis Tests
 - **Unit Root Tests** - ADF, KPSS, Phillips-Perron, Zivot-Andrews, Ng-Perron
@@ -343,7 +344,7 @@ news = nowcast_news(X_new, X_old, dfm, T)          # News decomposition
 balanced = balance_panel(ts; r=2)                   # Fill NaN via DFM
 ```
 
-### Non-Gaussian SVAR
+### Statistical Identification
 
 ```julia
 using MacroEconometricModels
@@ -351,17 +352,17 @@ using MacroEconometricModels
 Y = randn(200, 3)
 model = estimate_var(Y, 2)
 
-# Check residual normality
+# Test for non-Gaussianity (prerequisite)
 suite = normality_test_suite(model)
 
-# ICA-based identification
+# Non-Gaussianity: ICA-based identification
 ica = identify_fastica(model)
 irfs = irf(model, 20; method=:fastica)
 
-# Non-Gaussian ML identification
+# Non-Gaussianity: parametric ML identification
 ml = identify_student_t(model)
 
-# Heteroskedasticity-based identification
+# Heteroskedasticity: Markov-switching regimes
 ms = identify_markov_switching(model; n_regimes=2)
 ```
 
@@ -543,9 +544,13 @@ Full documentation available at [https://chung9207.github.io/MacroEconometricMod
 - Hansen, Lars Peter. 1982. "Large Sample Properties of Generalized Method of Moments Estimators." *Econometrica* 50 (4): 1029–1054. [https://doi.org/10.2307/1912775](https://doi.org/10.2307/1912775)
 - Newey, Whitney K., and Kenneth D. West. 1987. "A Simple, Positive Semi-Definite, Heteroskedasticity and Autocorrelation Consistent Covariance Matrix." *Econometrica* 55 (3): 703–708. [https://doi.org/10.2307/1913610](https://doi.org/10.2307/1913610)
 
-### Non-Gaussian Identification
+### Statistical Identification via Higher Moments
 
+- Lewis, Daniel J. 2025. "Identification Based on Higher Moments in Macroeconometrics." *Annual Review of Economics* 17: 665–693. [https://doi.org/10.1146/annurev-economics-070124-051419](https://doi.org/10.1146/annurev-economics-070124-051419)
+- Lewis, Daniel J. 2021. "Identifying Shocks via Time-Varying Volatility." *Review of Economic Studies* 88 (6): 3086–3124. [https://doi.org/10.1093/restud/rdab009](https://doi.org/10.1093/restud/rdab009)
+- Gourieroux, Christian, Alain Monfort, and Jean-Paul Renne. 2017. "Statistical Inference for Independent Component Analysis: Application to Structural VAR Models." *Journal of Econometrics* 196 (1): 111–126. [https://doi.org/10.1016/j.jeconom.2016.09.007](https://doi.org/10.1016/j.jeconom.2016.09.007)
 - Hyvärinen, Aapo. 1999. "Fast and Robust Fixed-Point Algorithms for Independent Component Analysis." *IEEE Transactions on Neural Networks* 10 (3): 626–634. [https://doi.org/10.1109/72.761722](https://doi.org/10.1109/72.761722)
+- Keweloh, Sascha A. 2021. "A Generalized Method of Moments Estimator for Structural Vector Autoregressions Based on Higher Moments." *Journal of Business & Economic Statistics* 39 (3): 772–882. [https://doi.org/10.1080/07350015.2020.1730858](https://doi.org/10.1080/07350015.2020.1730858)
 - Lanne, Markku, Mika Meitz, and Pentti Saikkonen. 2017. "Identification and Estimation of Non-Gaussian Structural Vector Autoregressions." *Journal of Econometrics* 196 (2): 288–304. [https://doi.org/10.1016/j.jeconom.2016.06.002](https://doi.org/10.1016/j.jeconom.2016.06.002)
 - Lanne, Markku, and Helmut Lütkepohl. 2010. "Structural Vector Autoregressions with Nonnormal Residuals." *Journal of Business & Economic Statistics* 28 (1): 159–168. [https://doi.org/10.1198/jbes.2009.06003](https://doi.org/10.1198/jbes.2009.06003)
 - Rigobon, Roberto. 2003. "Identification through Heteroskedasticity." *Review of Economics and Statistics* 85 (4): 777–792. [https://doi.org/10.1162/003465303772815727](https://doi.org/10.1162/003465303772815727)

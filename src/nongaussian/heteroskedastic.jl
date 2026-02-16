@@ -17,13 +17,16 @@
 # along with MacroEconometricModels.jl. If not, see <https://www.gnu.org/licenses/>.
 
 """
-Heteroskedasticity-based SVAR identification.
+Heteroskedasticity-based SVAR identification (Lewis 2025, Section 3).
 
-Exploits changes in the volatility regime to identify structural shocks without
-distributional assumptions. Methods: Markov-switching, GARCH, smooth transition,
-external volatility instruments.
+Exploits time-varying second moments (changes in the volatility regime) to identify
+structural shocks without distributional assumptions. Methods: Markov-switching,
+GARCH, smooth transition, external volatility instruments.
 
 References:
+- Lewis, D. J. (2025). "Identification based on higher moments in macroeconometrics."
+- Lewis, D. J. (2021). "Identifying shocks via time-varying volatility."
+- Sentana, E. & Fiorentini, G. (2001). "Identification, estimation and testing of conditionally heteroskedastic factor models."
 - Rigobon, R. (2003). "Identification through heteroskedasticity."
 - Lanne, M. & Lütkepohl, H. (2008). "Identifying monetary policy shocks via changes in volatility."
 - Normandin, M. & Phaneuf, L. (2004). "Monetary policy shocks."

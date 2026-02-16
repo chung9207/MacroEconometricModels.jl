@@ -37,7 +37,7 @@ makedocs(;
         ],
         "Innovation Accounting" => "innovation_accounting.md",
         "Nowcasting" => "nowcast.md",
-        "Non-Gaussian Identification" => "nongaussian.md",
+        "Statistical Identification" => "nongaussian.md",
         "Hypothesis Tests" => "hypothesis_tests.md",
         "Visualization" => "plotting.md",
         "Examples" => "examples.md",

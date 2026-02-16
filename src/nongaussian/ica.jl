@@ -19,10 +19,13 @@
 """
 ICA-based SVAR identification: FastICA, JADE, SOBI, dCov, HSIC.
 
-Recovers structural shocks under the assumption that at most one shock is Gaussian.
-The unmixing matrix W satisfies ε_t = W u_t where ε_t are independent non-Gaussian shocks.
+Nonparametric identification via non-Gaussianity (Lewis 2025, Section 4).
+Recovers structural shocks under the assumption that at most one shock is Gaussian
+(Darmois-Skitovich theorem; Comon 1994). The unmixing matrix W satisfies
+ε_t = W u_t where ε_t are independent non-Gaussian shocks.
 
 References:
+- Lewis, D. J. (2025). "Identification based on higher moments in macroeconometrics."
 - Hyvärinen, A. (1999). "Fast and robust fixed-point algorithms for independent component analysis."
 - Cardoso, J.-F. & Souloumiac, A. (1993). "Blind beamforming for non-Gaussian signals."
 - Belouchrani, A. et al. (1997). "A blind source separation technique using second-order statistics."
