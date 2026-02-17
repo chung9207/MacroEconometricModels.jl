@@ -6,16 +6,16 @@ DocMeta.setdocmeta!(MacroEconometricModels, :DocTestSetup, :(using MacroEconomet
 makedocs(;
     modules=[MacroEconometricModels],
     authors="Wookyung Chung <chung@friedman.jp>",
-    repo="https://github.com/chung9207/MacroEconometricModels.jl/blob/{commit}{path}#{line}",
+    repo="https://github.com/FriedmanJP/MacroEconometricModels.jl/blob/{commit}{path}#{line}",
     sitename="MacroEconometricModels.jl",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
-        canonical="https://chung9207.github.io/MacroEconometricModels.jl",
+        canonical="https://FriedmanJP.github.io/MacroEconometricModels.jl",
         edit_link="main",
         assets=["assets/custom.css", "assets/theme-toggle.js"],
         size_threshold=500 * 1024,
         mathengine=Documenter.MathJax3(),
-        repolink="https://github.com/chung9207/MacroEconometricModels.jl",
+        repolink="https://github.com/FriedmanJP/MacroEconometricModels.jl",
     ),
     pages=[
         "Home" => "index.md",
@@ -52,6 +52,6 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="github.com/chung9207/MacroEconometricModels.jl",
+    repo="github.com/FriedmanJP/MacroEconometricModels.jl",
     devbranch="main",
 )

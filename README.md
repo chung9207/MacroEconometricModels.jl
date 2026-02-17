@@ -1,8 +1,8 @@
 # MacroEconometricModels.jl
 
-[![CI](https://github.com/chung9207/MacroEconometricModels.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/chung9207/MacroEconometricModels.jl/actions/workflows/CI.yml)
-[![codecov](https://codecov.io/gh/chung9207/MacroEconometricModels.jl/graph/badge.svg?token=PB8UPGDJIY)](https://codecov.io/gh/chung9207/MacroEconometricModels.jl)
-[![](https://img.shields.io/badge/docs-stable-blue.svg)](https://chung9207.github.io/MacroEconometricModels.jl/stable/)
+[![CI](https://github.com/FriedmanJP/MacroEconometricModels.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/FriedmanJP/MacroEconometricModels.jl/actions/workflows/CI.yml)
+[![codecov](https://codecov.io/gh/FriedmanJP/MacroEconometricModels.jl/graph/badge.svg?token=PB8UPGDJIY)](https://codecov.io/gh/FriedmanJP/MacroEconometricModels.jl)
+[![](https://img.shields.io/badge/docs-stable-blue.svg)](https://FriedmanJP.github.io/MacroEconometricModels.jl/stable/)
 [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18439170.svg)](https://doi.org/10.5281/zenodo.18439170)
 
@@ -470,7 +470,7 @@ refs(:johansen; format=:html)   # HTML with DOI links
 
 ## Documentation
 
-Full documentation available at [https://chung9207.github.io/MacroEconometricModels.jl/dev/](https://chung9207.github.io/MacroEconometricModels.jl/dev/)
+Full documentation available at [https://FriedmanJP.github.io/MacroEconometricModels.jl/dev/](https://FriedmanJP.github.io/MacroEconometricModels.jl/dev/)
 
 ## References
 

@@ -474,7 +474,7 @@ This package is released under the [GNU General Public License v3.0](https://www
 
 ## Contributing
 
-Contributions are welcome! Please see the [GitHub repository](https://github.com/chung9207/MacroEconometricModels.jl) for contribution guidelines.
+Contributions are welcome! Please see the [GitHub repository](https://github.com/FriedmanJP/MacroEconometricModels.jl) for contribution guidelines.
 
 ## Contents
 

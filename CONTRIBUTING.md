@@ -4,7 +4,7 @@ Thank you for your interest in contributing. This guide explains how to report b
 
 ## Reporting Bugs
 
-Open an [issue](https://github.com/chung9207/MacroEconometricModels.jl/issues) with:
+Open an [issue](https://github.com/FriedmanJP/MacroEconometricModels.jl/issues) with:
 
 - A clear, descriptive title
 - Minimal reproducible example (MWE)
@@ -13,7 +13,7 @@ Open an [issue](https://github.com/chung9207/MacroEconometricModels.jl/issues) w
 
 ## Requesting New Features or Models
 
-Open an [issue](https://github.com/chung9207/MacroEconometricModels.jl/issues) with:
+Open an [issue](https://github.com/FriedmanJP/MacroEconometricModels.jl/issues) with:
 
 - A description of the feature or econometric model
 - Key references (papers, textbooks) for new models
@@ -26,7 +26,7 @@ Pull requests are welcome for bug fixes and new models/features. Before starting
 ### Setup
 
 ```bash
-git clone https://github.com/chung9207/MacroEconometricModels.jl.git
+git clone https://github.com/FriedmanJP/MacroEconometricModels.jl.git
 cd MacroEconometricModels.jl
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
 ```
