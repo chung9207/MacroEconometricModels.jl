@@ -49,42 +49,50 @@ function main()
     # Prepare shared data
     # -------------------------------------------------------------------
     if use_real
+        # Subset to Great Moderation (1987:01–2007:12) for cleaner macro data
+        gm_start = (1987 - 1959) * 12 + 1  # row 337
+        gm_end   = min((2007 - 1959) * 12 + 12, nobs(fred_md))  # row 588
+        fred_gm = TimeSeriesData(fred_md.data[gm_start:gm_end, :];
+                     varnames=fred_md.varnames, frequency=fred_md.frequency,
+                     tcode=fred_md.tcode)
+        println("  ✓ Great Moderation subset: $(nobs(fred_gm)) monthly obs")
+
         # 3-variable stationary macro panel (VAR / IRF / FEVD / HD / LP)
-        key_md = fred_md[:, ["INDPRO", "UNRATE", "CPIAUCSL"]]
+        key_md = fred_gm[:, ["INDPRO", "UNRATE", "CPIAUCSL"]]
         Y3 = _clean_rows(to_matrix(apply_tcode(key_md)))
 
-        # Univariate: INDPRO growth rate (ARIMA)
-        y1 = filter(isfinite, apply_tcode(fred_md[:, "INDPRO"], 5))
+        # Trending I(1) series: log INDPRO (for filters + ARIMA(1,1,0) with widening CIs)
+        y_rw = filter(isfinite, log.(fred_gm[:, "INDPRO"]))
 
-        # Trending I(1) series: log industrial production (filters)
-        y_rw = filter(isfinite, log.(fred_md[:, "INDPRO"]))
-
-        # Volatility: S&P 500 returns (fallback to INDPRO growth)
-        y_vol = copy(y1)
+        # Volatility: INDPRO growth rate (fallback to S&P 500 if available)
+        y_vol = filter(isfinite, apply_tcode(fred_gm[:, "INDPRO"], 5))
         sp_idx = findfirst(v -> occursin("S&P", v) && occursin("500", v),
-                           varnames(fred_md))
+                           varnames(fred_gm))
         if sp_idx !== nothing
             sp_ret = filter(isfinite,
-                            apply_tcode(fred_md[:, varnames(fred_md)[sp_idx]], 5))
+                            apply_tcode(fred_gm[:, varnames(fred_gm)[sp_idx]], 5))
             length(sp_ret) > 100 && (y_vol = sp_ret)
         end
 
         # Wide panel for factor models: ≤20 clean transformed series
-        # Filter out variables whose tcode requires positive data (≥4) but contain non-positive values
-        safe_idx = [i for i in 1:nvars(fred_md)
-                    if fred_md.tcode[i] < 4 || all(x -> isfinite(x) && x > 0, fred_md.data[:, i])]
-        fred_safe = fred_md[:, varnames(fred_md)[safe_idx]]
+        safe_idx = [i for i in 1:nvars(fred_gm)
+                    if fred_gm.tcode[i] < 4 || all(x -> isfinite(x) && x > 0, fred_gm.data[:, i])]
+        fred_safe = fred_gm[:, varnames(fred_gm)[safe_idx]]
         X_all = to_matrix(apply_tcode(fred_safe))
         good_cols = [j for j in 1:size(X_all,2) if !any(isnan, X_all[:,j])]
         X20 = X_all[:, good_cols[1:min(20, length(good_cols))]]
 
-        # Cointegrated quarterly data for VECM: log GDP components
-        qd_sub = fred_qd[:, ["GDPC1", "PCECC96", "GPDIC1"]]
+        # Cointegrated quarterly data for VECM: log GDP components (Great Moderation)
+        gm_q_start = (1987 - 1959) * 4 + 1  # row 113
+        gm_q_end   = min((2007 - 1959) * 4 + 4, nobs(fred_qd))  # row 196
+        fred_qd_gm = TimeSeriesData(fred_qd.data[gm_q_start:gm_q_end, :];
+                       varnames=fred_qd.varnames, frequency=fred_qd.frequency,
+                       tcode=fred_qd.tcode)
+        qd_sub = fred_qd_gm[:, ["GDPC1", "PCECC96", "GPDIC1"]]
         Y_ci = _clean_rows(log.(to_matrix(qd_sub)))
     else
         Y3    = randn(200, 3)
-        y1    = randn(200)
-        y_rw  = cumsum(randn(200))
+        y_rw  = cumsum(0.002 .+ 0.01 .* randn(200))
         y_vol = randn(200)
         X20   = randn(200, 20)
         Y_ci  = cumsum(randn(150, 3), dims=1)
@@ -93,7 +101,7 @@ function main()
     # -------------------------------------------------------------------
     # 1. Quick Start IRF
     # -------------------------------------------------------------------
-    m_var = estimate_var(Y3, 4)
+    m_var = estimate_var(Y3, 4; varnames=["INDPRO", "UNRATE", "CPI"])
     r_qs  = irf(m_var, 20; ci_type=:bootstrap, reps=500)
     save("quickstart_irf.html", plot_result(r_qs))
 
@@ -112,14 +120,14 @@ function main()
     # -------------------------------------------------------------------
     # 4. LP IRF
     # -------------------------------------------------------------------
-    lp_m = estimate_lp(Y3, 1, 20; lags=4)
+    lp_m = estimate_lp(Y3, 1, 20; lags=4, varnames=["INDPRO", "UNRATE", "CPI"])
     r_lp = lp_irf(lp_m)
     save("irf_lp.html", plot_result(r_lp))
 
     # -------------------------------------------------------------------
     # 5. Structural LP IRF
     # -------------------------------------------------------------------
-    slp = structural_lp(Y3, 20; method=:cholesky, lags=4)
+    slp = structural_lp(Y3, 20; method=:cholesky, lags=4, varnames=["INDPRO", "UNRATE", "CPI"])
     save("irf_structural_lp.html", plot_result(slp))
 
     # -------------------------------------------------------------------
@@ -164,9 +172,9 @@ function main()
     # -------------------------------------------------------------------
     # 16. ARIMA Forecast
     # -------------------------------------------------------------------
-    ar = estimate_ar(y1, 2)
+    ar = estimate_arima(y_rw, 1, 1, 0)
     fc_ar = forecast(ar, 20)
-    save("forecast_arima.html", plot_result(fc_ar; history=y1, n_history=30))
+    save("forecast_arima.html", plot_result(fc_ar; history=y_rw, n_history=30))
 
     # -------------------------------------------------------------------
     # 17. Volatility Forecast
@@ -179,13 +187,13 @@ function main()
     # 18. VECM Forecast
     # -------------------------------------------------------------------
     try
-        vecm_m  = estimate_vecm(Y_ci, 2; rank=1)
+        vecm_m  = estimate_vecm(Y_ci, 2; rank=1, varnames=["GDP", "PCE", "Investment"])
         fc_vecm = forecast(vecm_m, 10)
         save("forecast_vecm.html", plot_result(fc_vecm))
     catch e
         @warn "VECM with real data failed, using synthetic" exception=e
         Y_ci_syn = cumsum(randn(150, 3), dims=1)
-        vecm_m   = estimate_vecm(Y_ci_syn, 2; rank=1)
+        vecm_m   = estimate_vecm(Y_ci_syn, 2; rank=1, varnames=["GDP", "PCE", "Investment"])
         fc_vecm  = forecast(vecm_m, 10)
         save("forecast_vecm.html", plot_result(fc_vecm))
     end
@@ -201,7 +209,7 @@ function main()
     # 20. LP Forecast
     # -------------------------------------------------------------------
     Y_lp = Y3[end-99:end, :]
-    lp_fc_m = estimate_lp(Y_lp, 1, 10; lags=4)
+    lp_fc_m = estimate_lp(Y_lp, 1, 10; lags=4, varnames=["INDPRO", "UNRATE", "CPI"])
     shock_path = zeros(10); shock_path[1] = 1.0
     fc_lp = forecast(lp_fc_m, shock_path)
     save("forecast_lp.html", plot_result(fc_lp))
@@ -227,7 +235,7 @@ function main()
     # 24. TimeSeriesData
     # -------------------------------------------------------------------
     if use_real
-        d_ts = fred_md[:, ["INDPRO", "UNRATE", "CPIAUCSL"]]
+        d_ts = fred_gm[:, ["INDPRO", "UNRATE", "CPIAUCSL"]]
     else
         d_ts = TimeSeriesData(randn(100, 3); varnames=["GDP", "CPI", "RATE"])
     end
@@ -249,7 +257,7 @@ function main()
     # 26. Nowcast result
     # -------------------------------------------------------------------
     if use_real
-        nc_md  = fred_md[:, ["INDPRO", "UNRATE", "CPIAUCSL", "M2SL", "FEDFUNDS"]]
+        nc_md  = fred_gm[:, ["INDPRO", "UNRATE", "CPIAUCSL", "M2SL", "FEDFUNDS"]]
         Y_nc   = _clean_rows(to_matrix(apply_tcode(nc_md)))
         Y_nc   = Y_nc[end-99:end, :]
     else

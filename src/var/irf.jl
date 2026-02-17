@@ -212,8 +212,8 @@ function lp_irf(model::LPModel{T}; conf_level::Real=0.95) where {T<:AbstractFloa
     irf_data = extract_shock_irf(model.B, model.vcov, model.response_vars, 2;
                                   conf_level=conf_level)
 
-    response_names = default_var_names(length(model.response_vars); prefix="Var")
-    shock_name = "Shock $(model.shock_var)"
+    response_names = model.varnames[model.response_vars]
+    shock_name = model.varnames[model.shock_var]
     cov_type_sym = model.cov_estimator isa NeweyWestEstimator ? :newey_west : :white
 
     LPImpulseResponse{T}(irf_data.values, irf_data.ci_lower, irf_data.ci_upper,

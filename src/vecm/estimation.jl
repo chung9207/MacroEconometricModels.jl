@@ -53,7 +53,8 @@ function estimate_vecm(Y::AbstractMatrix{T}, p::Int;
                        rank::Union{Symbol,Int}=:auto,
                        deterministic::Symbol=:constant,
                        method::Symbol=:johansen,
-                       significance::Real=0.05) where {T<:AbstractFloat}
+                       significance::Real=0.05,
+                       varnames::Vector{String}=["y$i" for i in 1:size(Y,2)]) where {T<:AbstractFloat}
 
     deterministic ∈ (:none, :constant, :trend) ||
         throw(ArgumentError("deterministic must be :none, :constant, or :trend"))
@@ -65,7 +66,7 @@ function estimate_vecm(Y::AbstractMatrix{T}, p::Int;
     T_obs < n + p + 10 && throw(ArgumentError("Not enough observations for VECM estimation"))
 
     if method == :engle_granger
-        return _estimate_vecm_engle_granger(Y, p, deterministic, rank)
+        return _estimate_vecm_engle_granger(Y, p, deterministic, rank, varnames)
     end
 
     # === Johansen MLE ===
@@ -87,7 +88,7 @@ function estimate_vecm(Y::AbstractMatrix{T}, p::Int;
     # Handle edge cases
     if r == 0
         # No cointegration: estimate as VAR in differences
-        return _vecm_rank_zero(Y, p, n, deterministic, joh)
+        return _vecm_rank_zero(Y, p, n, deterministic, joh, varnames)
     end
 
     # Construct VECM matrices (parallels johansen.jl)
@@ -193,7 +194,7 @@ function estimate_vecm(Y::AbstractMatrix{T}, p::Int;
     VECMModel{T}(
         Matrix{T}(Y), p, r, alpha_ols, beta, Pi, Gamma, mu, U, Sigma,
         aic_val, bic_val, hqic_val, loglik,
-        deterministic, :johansen, joh
+        deterministic, :johansen, joh, varnames
     )
 end
 
@@ -284,7 +285,7 @@ function to_var(vecm::VECMModel{T}) where {T}
     bic_val = log_det + k * log(T_eff) / T_eff
     hqic_val = log_det + 2 * k * log(log(T_eff)) / T_eff
 
-    VARModel(vecm.Y, p, B, U, Sigma, aic_val, bic_val, hqic_val)
+    VARModel(vecm.Y, p, B, U, Sigma, aic_val, bic_val, hqic_val, vecm.varnames)
 end
 
 # =============================================================================
@@ -360,7 +361,7 @@ function _build_deterministic_Z(::Type{T}, T_eff::Int, dY_lags::Matrix{T}, deter
 end
 
 function _vecm_rank_zero(Y::Matrix{T}, p::Int, n::Int, deterministic::Symbol,
-                         joh::JohansenResult{T}) where {T}
+                         joh::JohansenResult{T}, varnames::Vector{String}) where {T}
     # No cointegration: model in first differences
     dY = diff(Y, dims=1)
     T_obs = size(Y, 1)
@@ -415,13 +416,14 @@ function _vecm_rank_zero(Y::Matrix{T}, p::Int, n::Int, deterministic::Symbol,
         zeros(T, n, 0), zeros(T, n, 0), zeros(T, n, n),
         Gamma, mu, U, Sigma,
         aic_val, bic_val, hqic_val, loglik,
-        deterministic, :johansen, joh
+        deterministic, :johansen, joh, varnames
     )
 end
 
 function _estimate_vecm_engle_granger(Y::Matrix{T}, p::Int,
                                       deterministic::Symbol,
-                                      rank_input::Union{Symbol,Int}) where {T}
+                                      rank_input::Union{Symbol,Int},
+                                      varnames::Vector{String}) where {T}
     T_obs, n = size(Y)
     n < 2 && throw(ArgumentError("Engle-Granger requires at least 2 variables"))
 
@@ -494,6 +496,6 @@ function _estimate_vecm_engle_granger(Y::Matrix{T}, p::Int,
     VECMModel{T}(
         Y, p, 1, alpha, beta, Pi, Gamma, mu, U, Sigma,
         aic_val, bic_val, hqic_val, loglik,
-        deterministic, :engle_granger, nothing
+        deterministic, :engle_granger, nothing, varnames
     )
 end

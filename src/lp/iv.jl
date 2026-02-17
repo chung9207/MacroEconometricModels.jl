@@ -90,7 +90,8 @@ Estimate LP with Instrumental Variables (Stock & Watson 2018) using 2SLS.
 function estimate_lp_iv(Y::AbstractMatrix{T}, shock_var::Int, instruments::AbstractMatrix{T},
                         horizon::Int; lags::Int=4,
                         response_vars::Vector{Int}=collect(1:size(Y, 2)),
-                        cov_type::Symbol=:newey_west, bandwidth::Int=0) where {T<:AbstractFloat}
+                        cov_type::Symbol=:newey_west, bandwidth::Int=0,
+                        varnames::Vector{String}=["y$i" for i in 1:size(Y, 2)]) where {T<:AbstractFloat}
     T_obs, n = size(Y)
     n_inst = size(instruments, 2)
 
@@ -144,7 +145,7 @@ function estimate_lp_iv(Y::AbstractMatrix{T}, shock_var::Int, instruments::Abstr
 
     LPIVModel{T}(Matrix{T}(Y), shock_var, response_vars, Matrix{T}(instruments),
                  horizon, lags, B, residuals_store, vcov, first_stage_F,
-                 first_stage_coef, T_eff, cov_estimator)
+                 first_stage_coef, T_eff, cov_estimator, varnames)
 end
 
 estimate_lp_iv(Y::AbstractMatrix, shock_var::Int, instruments::AbstractMatrix,
@@ -176,8 +177,8 @@ function lp_iv_irf(model::LPIVModel{T}; conf_level::Real=0.95) where {T<:Abstrac
     irf_data = extract_shock_irf(model.B, model.vcov, model.response_vars, 2;
                                   conf_level=conf_level)
 
-    response_names = default_var_names(length(model.response_vars); prefix="Var")
-    shock_name = "Instrumented Shock $(model.shock_var)"
+    response_names = model.varnames[model.response_vars]
+    shock_name = "$(model.varnames[model.shock_var]) (IV)"
     cov_type_sym = model.cov_estimator isa NeweyWestEstimator ? :newey_west : :white
 
     LPImpulseResponse{T}(irf_data.values, irf_data.ci_lower, irf_data.ci_upper,

@@ -120,7 +120,7 @@ function forecast(lp::LPModel{T}, shock_path::AbstractVector{<:Real};
     end
 
     LPForecast(forecasts, ci_lower, ci_upper, se_mat, H,
-               lp.response_vars, lp.shock_var, shock_path_T, T(conf_level), ci_method)
+               lp.response_vars, lp.shock_var, shock_path_T, T(conf_level), ci_method, lp.varnames)
 end
 
 """Build the control vector from LP model's last observations."""

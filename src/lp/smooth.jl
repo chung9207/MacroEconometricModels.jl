@@ -107,7 +107,8 @@ Estimate Smooth LP with B-spline parameterization (Barnichon & Brownlees 2019).
 function estimate_smooth_lp(Y::AbstractMatrix{T}, shock_var::Int, horizon::Int;
                             degree::Int=3, n_knots::Int=4, lambda::T=T(0.0),
                             lags::Int=4, response_vars::Vector{Int}=collect(1:size(Y, 2)),
-                            cov_type::Symbol=:newey_west, bandwidth::Int=0) where {T<:AbstractFloat}
+                            cov_type::Symbol=:newey_west, bandwidth::Int=0,
+                            varnames::Vector{String}=["y$i" for i in 1:size(Y, 2)]) where {T<:AbstractFloat}
     T_obs, n = size(Y)
     n_response = length(response_vars)
     horizons = collect(0:horizon)
@@ -157,7 +158,7 @@ function estimate_smooth_lp(Y::AbstractMatrix{T}, shock_var::Int, horizon::Int;
 
     SmoothLPModel{T}(Matrix{T}(Y), shock_var, response_vars, horizon, lags, basis,
                      theta, vcov_theta, lambda, irf_values, Matrix{T}(irf_se),
-                     residuals, T_total, cov_estimator)
+                     residuals, T_total, cov_estimator, varnames)
 end
 
 estimate_smooth_lp(Y::AbstractMatrix, shock_var::Int, horizon::Int; kwargs...) =
@@ -219,11 +220,11 @@ function smooth_lp_irf(model::SmoothLPModel{T}; conf_level::Real=0.95) where {T<
     ci_lower = model.irf_values .- z .* model.irf_se
     ci_upper = model.irf_values .+ z .* model.irf_se
 
-    response_names = default_var_names(length(model.response_vars); prefix="Var")
+    response_names = model.varnames[model.response_vars]
     cov_type_sym = model.cov_estimator isa NeweyWestEstimator ? :newey_west : :white
 
     LPImpulseResponse{T}(model.irf_values, ci_lower, ci_upper, model.irf_se, model.horizon,
-                         response_names, "Shock $(model.shock_var)", cov_type_sym, T(conf_level))
+                         response_names, model.varnames[model.shock_var], cov_type_sym, T(conf_level))
 end
 
 """

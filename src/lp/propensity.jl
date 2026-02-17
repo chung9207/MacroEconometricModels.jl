@@ -100,7 +100,8 @@ function estimate_propensity_lp(Y::AbstractMatrix{T}, treatment::AbstractVector{
                                 ps_method::Symbol=:logit,
                                 trimming::Tuple{T,T}=(T(0.01), T(0.99)),
                                 lags::Int=4, response_vars::Vector{Int}=collect(1:size(Y, 2)),
-                                cov_type::Symbol=:newey_west, bandwidth::Int=0) where {T<:AbstractFloat}
+                                cov_type::Symbol=:newey_west, bandwidth::Int=0,
+                                varnames::Vector{String}=["y$i" for i in 1:size(Y, 2)]) where {T<:AbstractFloat}
     T_obs, n = size(Y)
     @assert length(treatment) == T_obs
 
@@ -183,7 +184,7 @@ function estimate_propensity_lp(Y::AbstractMatrix{T}, treatment::AbstractVector{
 
     PropensityLPModel{T}(Matrix{T}(Y), treatment, response_vars, Matrix{T}(covariates),
                          horizon, propensity, ipw_weights, B, residuals_store, vcov_vec,
-                         ate, ate_se, config, T_eff, cov_estimator)
+                         ate, ate_se, config, T_eff, cov_estimator, varnames)
 end
 
 estimate_propensity_lp(Y::AbstractMatrix, treatment::AbstractVector, covariates::AbstractMatrix,
@@ -200,7 +201,8 @@ function doubly_robust_lp(Y::AbstractMatrix{T}, treatment::AbstractVector{Bool},
                           covariates::AbstractMatrix{T}, horizon::Int;
                           ps_method::Symbol=:logit, trimming::Tuple{T,T}=(T(0.01), T(0.99)),
                           lags::Int=4, response_vars::Vector{Int}=collect(1:size(Y, 2)),
-                          cov_type::Symbol=:newey_west, bandwidth::Int=0) where {T<:AbstractFloat}
+                          cov_type::Symbol=:newey_west, bandwidth::Int=0,
+                          varnames::Vector{String}=["y$i" for i in 1:size(Y, 2)]) where {T<:AbstractFloat}
     T_obs, n = size(Y)
     n_response = length(response_vars)
     n_cov = size(covariates, 2)
@@ -289,7 +291,7 @@ function doubly_robust_lp(Y::AbstractMatrix{T}, treatment::AbstractVector{Bool},
 
     PropensityLPModel{T}(Matrix{T}(Y), treatment, response_vars, Matrix{T}(covariates),
                          horizon, propensity, ipw_weights, B, residuals_store, vcov_vec,
-                         ate, ate_se, config, T_eff, cov_estimator)
+                         ate, ate_se, config, T_eff, cov_estimator, varnames)
 end
 
 """
@@ -302,7 +304,7 @@ function propensity_irf(model::PropensityLPModel{T}; conf_level::Real=0.95) wher
     ci_lower = model.ate .- z .* model.ate_se
     ci_upper = model.ate .+ z .* model.ate_se
 
-    response_names = default_var_names(length(model.response_vars); prefix="Var")
+    response_names = model.varnames[model.response_vars]
     cov_type_sym = model.cov_estimator isa NeweyWestEstimator ? :newey_west : :white
 
     LPImpulseResponse{T}(model.ate, ci_lower, ci_upper, model.ate_se, model.horizon,

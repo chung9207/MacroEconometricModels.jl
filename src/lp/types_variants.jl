@@ -54,13 +54,15 @@ struct LPIVModel{T<:AbstractFloat} <: AbstractLPModel
     first_stage_coef::Vector{Vector{T}}
     T_eff::Vector{Int}
     cov_estimator::AbstractCovarianceEstimator
+    varnames::Vector{String}
 
     function LPIVModel{T}(Y::Matrix{T}, shock_var::Int, response_vars::Vector{Int},
                           instruments::Matrix{T}, horizon::Int, lags::Int,
                           B::Vector{Matrix{T}}, residuals::Vector{Matrix{T}},
                           vcov::Vector{Matrix{T}}, first_stage_F::Vector{T},
                           first_stage_coef::Vector{Vector{T}}, T_eff::Vector{Int},
-                          cov_estimator::AbstractCovarianceEstimator) where {T<:AbstractFloat}
+                          cov_estimator::AbstractCovarianceEstimator,
+                          varnames::Vector{String}=["y$i" for i in 1:size(Y,2)]) where {T<:AbstractFloat}
         n = size(Y, 2)
         @assert 1 <= shock_var <= n "shock_var must be in 1:$n"
         @assert all(1 .<= response_vars .<= n) "response_vars must be in 1:$n"
@@ -68,7 +70,7 @@ struct LPIVModel{T<:AbstractFloat} <: AbstractLPModel
         @assert size(instruments, 2) >= 1 "need at least one instrument"
         @assert length(first_stage_F) == horizon + 1
         new{T}(Y, shock_var, response_vars, instruments, horizon, lags, B, residuals,
-               vcov, first_stage_F, first_stage_coef, T_eff, cov_estimator)
+               vcov, first_stage_F, first_stage_coef, T_eff, cov_estimator, varnames)
     end
 end
 
@@ -153,12 +155,14 @@ struct SmoothLPModel{T<:AbstractFloat} <: AbstractLPModel
     residuals::Matrix{T}
     T_eff::Int
     cov_estimator::AbstractCovarianceEstimator
+    varnames::Vector{String}
 
     function SmoothLPModel{T}(Y::Matrix{T}, shock_var::Int, response_vars::Vector{Int},
                               horizon::Int, lags::Int, spline_basis::BSplineBasis{T},
                               theta::Matrix{T}, vcov_theta::Matrix{T}, lambda::T,
                               irf_values::Matrix{T}, irf_se::Matrix{T}, residuals::Matrix{T},
-                              T_eff::Int, cov_estimator::AbstractCovarianceEstimator) where {T<:AbstractFloat}
+                              T_eff::Int, cov_estimator::AbstractCovarianceEstimator,
+                              varnames::Vector{String}=["y$i" for i in 1:size(Y,2)]) where {T<:AbstractFloat}
         n = size(Y, 2)
         @assert 1 <= shock_var <= n
         @assert all(1 .<= response_vars .<= n)
@@ -166,7 +170,7 @@ struct SmoothLPModel{T<:AbstractFloat} <: AbstractLPModel
         @assert size(theta, 1) == n_basis(spline_basis)
         @assert size(theta, 2) == length(response_vars)
         new{T}(Y, shock_var, response_vars, horizon, lags, spline_basis, theta,
-               vcov_theta, lambda, irf_values, irf_se, residuals, T_eff, cov_estimator)
+               vcov_theta, lambda, irf_values, irf_se, residuals, T_eff, cov_estimator, varnames)
     end
 end
 
@@ -259,13 +263,15 @@ struct StateLPModel{T<:AbstractFloat} <: AbstractLPModel
     vcov_diff::Vector{Matrix{T}}
     T_eff::Vector{Int}
     cov_estimator::AbstractCovarianceEstimator
+    varnames::Vector{String}
 
     function StateLPModel{T}(Y::Matrix{T}, shock_var::Int, response_vars::Vector{Int},
                              horizon::Int, lags::Int, state::StateTransition{T},
                              B_expansion::Vector{Matrix{T}}, B_recession::Vector{Matrix{T}},
                              residuals::Vector{Matrix{T}}, vcov_expansion::Vector{Matrix{T}},
                              vcov_recession::Vector{Matrix{T}}, vcov_diff::Vector{Matrix{T}},
-                             T_eff::Vector{Int}, cov_estimator::AbstractCovarianceEstimator) where {T<:AbstractFloat}
+                             T_eff::Vector{Int}, cov_estimator::AbstractCovarianceEstimator,
+                             varnames::Vector{String}=["y$i" for i in 1:size(Y,2)]) where {T<:AbstractFloat}
         n = size(Y, 2)
         @assert 1 <= shock_var <= n
         @assert all(1 .<= response_vars .<= n)
@@ -274,7 +280,7 @@ struct StateLPModel{T<:AbstractFloat} <: AbstractLPModel
         @assert length(B_recession) == horizon + 1
         new{T}(Y, shock_var, response_vars, horizon, lags, state, B_expansion,
                B_recession, residuals, vcov_expansion, vcov_recession, vcov_diff,
-               T_eff, cov_estimator)
+               T_eff, cov_estimator, varnames)
     end
 end
 
@@ -355,13 +361,15 @@ struct PropensityLPModel{T<:AbstractFloat} <: AbstractLPModel
     config::PropensityScoreConfig{T}
     T_eff::Vector{Int}
     cov_estimator::AbstractCovarianceEstimator
+    varnames::Vector{String}
 
     function PropensityLPModel{T}(Y::Matrix{T}, treatment::AbstractVector{Bool}, response_vars::Vector{Int},
                                   covariates::Matrix{T}, horizon::Int, propensity_scores::Vector{T},
                                   ipw_weights::Vector{T}, B::Vector{Matrix{T}},
                                   residuals::Vector{Matrix{T}}, vcov::Vector{Matrix{T}},
                                   ate::Matrix{T}, ate_se::Matrix{T}, config::PropensityScoreConfig{T},
-                                  T_eff::Vector{Int}, cov_estimator::AbstractCovarianceEstimator) where {T<:AbstractFloat}
+                                  T_eff::Vector{Int}, cov_estimator::AbstractCovarianceEstimator,
+                                  varnames::Vector{String}=["y$i" for i in 1:size(Y,2)]) where {T<:AbstractFloat}
         n = size(Y, 2)
         @assert length(treatment) == size(Y, 1)
         @assert all(1 .<= response_vars .<= n)
@@ -371,7 +379,7 @@ struct PropensityLPModel{T<:AbstractFloat} <: AbstractLPModel
         @assert size(ate, 1) == horizon + 1
         @assert size(ate, 2) == length(response_vars)
         new{T}(Y, collect(Bool, treatment), response_vars, covariates, horizon, propensity_scores,
-               ipw_weights, B, residuals, vcov, ate, ate_se, config, T_eff, cov_estimator)
+               ipw_weights, B, residuals, vcov, ate, ate_se, config, T_eff, cov_estimator, varnames)
     end
 end
 

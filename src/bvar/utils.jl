@@ -91,15 +91,22 @@ function process_posterior_samples(post::BVARPosterior, compute_func::Function;
     b_vecs, sigmas = extract_chain_parameters(post)
 
     results = Vector{Any}(undef, samples)
+    valid_count = 0
 
     for s in 1:samples
         m = parameters_to_model(b_vecs[s, :], sigmas[s, :], p, n, use_data)
+        if !is_stationary(m).is_stationary
+            continue
+        end
+        valid_count += 1
         Q = compute_Q(m, method, horizon, check_func, narrative_check;
                       max_draws=max_draws, transition_var=transition_var, regime_indicator=regime_indicator)
-        results[s] = compute_func(m, Q, horizon)
+        results[valid_count] = compute_func(m, Q, horizon)
     end
+    valid_count == 0 && error("All posterior draws are non-stationary; cannot process posterior samples")
+    valid_count < samples ÷ 2 && @warn "$(samples - valid_count)/$samples posterior draws non-stationary, skipped"
 
-    results, samples
+    results[1:valid_count], valid_count
 end
 
 # Deprecated wrapper for old (chain, p, n) signature

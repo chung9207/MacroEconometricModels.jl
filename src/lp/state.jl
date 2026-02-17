@@ -124,7 +124,8 @@ function estimate_state_lp(Y::AbstractMatrix{T}, shock_var::Int, state_var::Abst
                            horizon::Int; gamma::Union{T,Symbol}=:estimate,
                            threshold::Union{T,Symbol}=:estimate,
                            lags::Int=4, response_vars::Vector{Int}=collect(1:size(Y, 2)),
-                           cov_type::Symbol=:newey_west, bandwidth::Int=0) where {T<:AbstractFloat}
+                           cov_type::Symbol=:newey_west, bandwidth::Int=0,
+                           varnames::Vector{String}=["y$i" for i in 1:size(Y, 2)]) where {T<:AbstractFloat}
     T_obs, n = size(Y)
     @assert length(state_var) == T_obs
 
@@ -224,7 +225,7 @@ function estimate_state_lp(Y::AbstractMatrix{T}, shock_var::Int, state_var::Abst
 
     StateLPModel{T}(Matrix{T}(Y), shock_var, response_vars, horizon, lags, state_transition,
                     B_expansion, B_recession, residuals_store, vcov_expansion, vcov_recession,
-                    vcov_diff, T_eff, cov_estimator)
+                    vcov_diff, T_eff, cov_estimator, varnames)
 end
 
 estimate_state_lp(Y::AbstractMatrix, shock_var::Int, state_var::AbstractVector,

@@ -257,7 +257,8 @@ The LP regression for horizon h:
 function estimate_lp(Y::AbstractMatrix{T}, shock_var::Int, horizon::Int;
                      lags::Int=4, response_vars::Vector{Int}=collect(1:size(Y, 2)),
                      cov_type::Symbol=:newey_west, bandwidth::Int=0,
-                     conf_level::Real=0.95) where {T<:AbstractFloat}
+                     conf_level::Real=0.95,
+                     varnames::Vector{String}=["y$i" for i in 1:size(Y, 2)]) where {T<:AbstractFloat}
     _validate_data(Y, "Y")
     T_obs, n = size(Y)
 
@@ -290,7 +291,7 @@ function estimate_lp(Y::AbstractMatrix{T}, shock_var::Int, horizon::Int;
     end
 
     LPModel(Matrix{T}(Y), shock_var, response_vars, horizon, lags,
-            B, residuals, vcov, T_eff, cov_estimator)
+            B, residuals, vcov, T_eff, cov_estimator, varnames)
 end
 
 # Float fallback
@@ -409,7 +410,8 @@ function structural_lp(Y::AbstractMatrix{T}, horizon::Int;
                        check_func=nothing, narrative_check=nothing,
                        max_draws::Int=1000,
                        transition_var::Union{Nothing,AbstractVector}=nothing,
-                       regime_indicator::Union{Nothing,AbstractVector{Int}}=nothing) where {T<:AbstractFloat}
+                       regime_indicator::Union{Nothing,AbstractVector{Int}}=nothing,
+                       varnames::Vector{String}=["y$i" for i in 1:size(Y, 2)]) where {T<:AbstractFloat}
     T_obs, n = size(Y)
     p = isnothing(var_lags) ? lags : var_lags
 
@@ -417,7 +419,7 @@ function structural_lp(Y::AbstractMatrix{T}, horizon::Int;
     @assert T_obs > p + horizon + 1 "Not enough observations"
 
     # Step 1: Estimate VAR for identification
-    var_model = estimate_var(Y, p)
+    var_model = estimate_var(Y, p; varnames=varnames)
 
     # Step 2: Compute identification matrix Q
     Q = compute_Q(var_model, method, horizon, check_func, narrative_check;

@@ -130,7 +130,7 @@ function plot_result(fc::VECMForecast{T};
     panels = _PanelSpec[]
     for vi in vars_to_plot
         id = _next_plot_id("vecm_fc")
-        ptitle = "Variable $vi"
+        ptitle = fc.varnames[vi]
 
         data_json = _forecast_data_json(fc.levels[:, vi], fc.ci_lower[:, vi],
                                          fc.ci_upper[:, vi])
@@ -228,7 +228,7 @@ function plot_result(fc::LPForecast{T};
     panels = _PanelSpec[]
     for vi in vars_to_plot
         id = _next_plot_id("lp_fc")
-        ptitle = "Response var $(fc.response_vars[vi])"
+        ptitle = fc.varnames[fc.response_vars[vi]]
 
         data_json = _forecast_data_json(fc.forecasts[:, vi], fc.ci_lower[:, vi],
                                          fc.ci_upper[:, vi])

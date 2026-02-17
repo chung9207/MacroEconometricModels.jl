@@ -80,11 +80,13 @@ struct LPModel{T<:AbstractFloat} <: AbstractLPModel
     vcov::Vector{Matrix{T}}
     T_eff::Vector{Int}
     cov_estimator::AbstractCovarianceEstimator
+    varnames::Vector{String}
 
     function LPModel(Y::Matrix{T}, shock_var::Int, response_vars::Vector{Int},
                      horizon::Int, lags::Int, B::Vector{Matrix{T}},
                      residuals::Vector{Matrix{T}}, vcov::Vector{Matrix{T}},
-                     T_eff::Vector{Int}, cov_estimator::AbstractCovarianceEstimator) where {T<:AbstractFloat}
+                     T_eff::Vector{Int}, cov_estimator::AbstractCovarianceEstimator,
+                     varnames::Vector{String}=["y$i" for i in 1:size(Y,2)]) where {T<:AbstractFloat}
         n = size(Y, 2)
         @assert 1 <= shock_var <= n "shock_var must be in 1:$n"
         @assert all(1 .<= response_vars .<= n) "response_vars must be in 1:$n"
@@ -94,7 +96,7 @@ struct LPModel{T<:AbstractFloat} <: AbstractLPModel
         @assert length(residuals) == horizon + 1 "residuals must have H+1 elements"
         @assert length(vcov) == horizon + 1 "vcov must have H+1 elements"
         @assert length(T_eff) == horizon + 1 "T_eff must have H+1 elements"
-        new{T}(Y, shock_var, response_vars, horizon, lags, B, residuals, vcov, T_eff, cov_estimator)
+        new{T}(Y, shock_var, response_vars, horizon, lags, B, residuals, vcov, T_eff, cov_estimator, varnames)
     end
 end
 
@@ -102,11 +104,12 @@ end
 function LPModel(Y::AbstractMatrix, shock_var::Int, response_vars::Vector{Int},
                  horizon::Int, lags::Int, B::Vector{<:AbstractMatrix},
                  residuals::Vector{<:AbstractMatrix}, vcov::Vector{<:AbstractMatrix},
-                 T_eff::Vector{Int}, cov_estimator::AbstractCovarianceEstimator)
+                 T_eff::Vector{Int}, cov_estimator::AbstractCovarianceEstimator,
+                 varnames::Vector{String}=["y$i" for i in 1:size(Y,2)])
     T = promote_type(eltype(Y), eltype(first(B)))
     LPModel(Matrix{T}(Y), shock_var, response_vars, horizon, lags,
             [Matrix{T}(b) for b in B], [Matrix{T}(r) for r in residuals],
-            [Matrix{T}(v) for v in vcov], T_eff, cov_estimator)
+            [Matrix{T}(v) for v in vcov], T_eff, cov_estimator, varnames)
 end
 
 # Accessors
@@ -235,11 +238,12 @@ struct LPForecast{T<:AbstractFloat} <: AbstractForecastResult{T}
     shock_path::Vector{T}
     conf_level::T
     ci_method::Symbol
+    varnames::Vector{String}
 
     function LPForecast(forecasts::Matrix{T}, ci_lower::Matrix{T}, ci_upper::Matrix{T},
                         se::Matrix{T}, horizon::Int, response_vars::Vector{Int},
                         shock_var::Int, shock_path::Vector{T}, conf_level::T,
-                        ci_method::Symbol) where {T<:AbstractFloat}
+                        ci_method::Symbol, varnames::Vector{String}=["y$i" for i in 1:max(maximum(response_vars), shock_var)]) where {T<:AbstractFloat}
         @assert size(forecasts) == size(ci_lower) == size(ci_upper) == size(se)
         @assert size(forecasts, 1) == horizon
         @assert size(forecasts, 2) == length(response_vars)
@@ -247,7 +251,7 @@ struct LPForecast{T<:AbstractFloat} <: AbstractForecastResult{T}
         @assert 0 < conf_level < 1
         @assert ci_method ∈ (:analytical, :bootstrap, :none)
         new{T}(forecasts, ci_lower, ci_upper, se, horizon, response_vars,
-               shock_var, shock_path, conf_level, ci_method)
+               shock_var, shock_path, conf_level, ci_method, varnames)
     end
 end
 

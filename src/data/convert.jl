@@ -90,7 +90,7 @@ estimate_var(d::TimeSeriesData, p::Int; kwargs...) =
 
 # VECM
 estimate_vecm(d::TimeSeriesData, p::Int; kwargs...) =
-    estimate_vecm(to_matrix(d), p; kwargs...)
+    estimate_vecm(to_matrix(d), p; varnames=d.varnames, kwargs...)
 
 # BVAR
 estimate_bvar(d::TimeSeriesData, p::Int; kwargs...) =
@@ -108,19 +108,19 @@ estimate_gdfm(d::TimeSeriesData, q::Int; kwargs...) =
 
 # LP
 estimate_lp(d::TimeSeriesData, shock_var::Int, horizon::Int; kwargs...) =
-    estimate_lp(to_matrix(d), shock_var, horizon; kwargs...)
+    estimate_lp(to_matrix(d), shock_var, horizon; varnames=d.varnames, kwargs...)
 
 estimate_lp_iv(d::TimeSeriesData, shock_var::Int, instruments::AbstractMatrix, horizon::Int; kwargs...) =
-    estimate_lp_iv(to_matrix(d), shock_var, instruments, horizon; kwargs...)
+    estimate_lp_iv(to_matrix(d), shock_var, instruments, horizon; varnames=d.varnames, kwargs...)
 
 estimate_smooth_lp(d::TimeSeriesData, shock_var::Int, horizon::Int; kwargs...) =
-    estimate_smooth_lp(to_matrix(d), shock_var, horizon; kwargs...)
+    estimate_smooth_lp(to_matrix(d), shock_var, horizon; varnames=d.varnames, kwargs...)
 
 estimate_state_lp(d::TimeSeriesData, shock_var::Int, state_var::AbstractVector, horizon::Int; kwargs...) =
-    estimate_state_lp(to_matrix(d), shock_var, state_var, horizon; kwargs...)
+    estimate_state_lp(to_matrix(d), shock_var, state_var, horizon; varnames=d.varnames, kwargs...)
 
 structural_lp(d::TimeSeriesData, horizon::Int; kwargs...) =
-    structural_lp(to_matrix(d), horizon; kwargs...)
+    structural_lp(to_matrix(d), horizon; varnames=d.varnames, kwargs...)
 
 # Johansen test
 johansen_test(d::TimeSeriesData, p::Int; kwargs...) =

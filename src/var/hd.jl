@@ -358,8 +358,13 @@ function historical_decomposition(post::BVARPosterior, horizon::Int=0;
 
     b_vecs, sigmas = extract_chain_parameters(post)
 
+    valid_count = 0
     for s in 1:samples
         m = parameters_to_model(b_vecs[s, :], sigmas[s, :], p, n, use_data)
+        if !is_stationary(m).is_stationary
+            continue
+        end
+        valid_count += 1
         Q = compute_Q(m, method, horizon, check_func, narrative_check;
                       max_draws=100, transition_var=transition_var, regime_indicator=regime_indicator)
 
@@ -368,10 +373,12 @@ function historical_decomposition(post::BVARPosterior, horizon::Int=0;
         contributions = _compute_hd_contributions(shocks, Theta)
         initial_cond = _compute_initial_conditions(actual, contributions)
 
-        all_contributions[s, :, :, :] = contributions
-        all_initial[s, :, :] = initial_cond
-        all_shocks[s, :, :] = shocks
+        all_contributions[valid_count, :, :, :] = contributions
+        all_initial[valid_count, :, :] = initial_cond
+        all_shocks[valid_count, :, :] = shocks
     end
+    valid_count == 0 && error("All posterior draws are non-stationary; cannot compute historical decomposition")
+    valid_count < samples ÷ 2 && @warn "$(samples - valid_count)/$samples posterior draws non-stationary, skipped"
 
     # Compute quantiles and means
     q_vec = ET.(quantiles)
@@ -386,16 +393,16 @@ function historical_decomposition(post::BVARPosterior, horizon::Int=0;
     @inbounds for t in 1:T_eff
         for i in 1:n
             # Initial conditions
-            d_init = @view all_initial[:, t, i]
+            d_init = @view all_initial[1:valid_count, t, i]
             initial_q[t, i, :] = quantile(d_init, q_vec)
             initial_m[t, i] = mean(d_init)
 
             # Shocks
-            d_shock = @view all_shocks[:, t, i]
+            d_shock = @view all_shocks[1:valid_count, t, i]
             shocks_m[t, i] = mean(d_shock)
 
             for j in 1:n
-                d = @view all_contributions[:, t, i, j]
+                d = @view all_contributions[1:valid_count, t, i, j]
                 contrib_q[t, i, j, :] = quantile(d, q_vec)
                 contrib_m[t, i, j] = mean(d)
             end

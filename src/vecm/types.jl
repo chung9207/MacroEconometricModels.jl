@@ -70,6 +70,7 @@ struct VECMModel{T<:AbstractFloat} <: AbstractVARModel
     deterministic::Symbol
     method::Symbol
     johansen_result::Union{Nothing,JohansenResult{T}}
+    varnames::Vector{String}
 end
 
 # =============================================================================
@@ -87,6 +88,7 @@ ncoefs(m::VECMModel) = m.rank + nvars(m) * (m.p - 1) + (m.deterministic != :none
 Return the cointegrating rank r of the VECM.
 """
 cointegrating_rank(m::VECMModel) = m.rank
+varnames(m::VECMModel) = m.varnames
 
 # =============================================================================
 # Display
@@ -137,6 +139,7 @@ struct VECMForecast{T<:AbstractFloat} <: AbstractForecastResult{T}
     ci_upper::Matrix{T}
     horizon::Int
     ci_method::Symbol
+    varnames::Vector{String}
 end
 
 function Base.show(io::IO, f::VECMForecast{T}) where {T}
@@ -151,7 +154,7 @@ function Base.show(io::IO, f::VECMForecast{T}) where {T}
     end
     _pretty_table(io, data;
         title = "VECM Forecast (levels, $(f.ci_method) CI)",
-        column_labels = vcat(["Horizon"], ["Var $j" for j in 1:n]),
+        column_labels = vcat(["Horizon"], [f.varnames[j] for j in 1:n]),
         alignment = vcat([:l], fill(:r, n)),
     )
 end
