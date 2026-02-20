@@ -216,8 +216,15 @@ function main()
     # -------------------------------------------------------------------
     # 20. LP Forecast
     # -------------------------------------------------------------------
-    Y_lp = Y3[end-99:end, :]
-    lp_fc_m = estimate_lp(Y_lp, 1, 10; lags=4, varnames=["INDPRO", "UNRATE", "CPI"])
+    # Use raw-level FRED-MD macro data (no tcode transform) for meaningful
+    # LP forecasts: 1pp fed funds rate shock → unemployment + 10y yield
+    _lp_vars = ["FEDFUNDS", "UNRATE", "GS10"]
+    _lp_avail = [v for v in _lp_vars if v in varnames(fred_gm)]
+    _Y_lp = to_matrix(fred_gm[:, _lp_avail])
+    _lp_good = [i for i in 1:size(_Y_lp,1) if all(isfinite, _Y_lp[i,:])]
+    _Y_lp = _Y_lp[_lp_good, :]
+    _Y_lp = _Y_lp[end-99:end, :]
+    lp_fc_m = estimate_lp(_Y_lp, 1, 10; lags=4, varnames=_lp_avail)
     shock_path = zeros(10); shock_path[1] = 1.0
     fc_lp = forecast(lp_fc_m, shock_path)
     save("forecast_lp.html", plot_result(fc_lp))
