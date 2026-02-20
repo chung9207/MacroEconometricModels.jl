@@ -431,6 +431,9 @@ ngperron_test
 !!! note "Technical Note"
     The Ng-Perron tests use GLS detrending which provides substantially better size properties than the standard ADF test in small samples (``T < 100``). When the ADF test has borderline results, the Ng-Perron MZt statistic is a more reliable indicator. However, ADF remains preferable when the data-generating process has a large negative MA root, as GLS-based tests can be oversized in that case (Perron & Ng, 1996).
 
+!!! note "Implementation Detail"
+    The autoregressive spectral density estimator ``s^2_{AR}`` is computed by fitting an AR model to the *differenced* GLS-detrended series ``\Delta \tilde{y}_t``, following Ng & Perron (2001, equation 11). This ensures the spectral density estimate is consistent under the unit root null.
+
 ---
 
 ### Convenience Functions
@@ -554,6 +557,9 @@ johansen_test
 |----------|-------------|---------|
 | `p` | Lags in VECM representation | Required |
 | `deterministic` | `:none`, `:constant`, or `:trend` | `:constant` |
+
+!!! note "Deterministic Term Placement"
+    The `deterministic` keyword controls the placement of deterministic terms following Johansen's (1995) five cases. With `:constant` (Case 2), the intercept is restricted to the cointegrating space — it enters the error correction term ``\Pi y_{t-1}`` but not the short-run dynamics, preventing linear trends in levels. With `:trend` (Case 4), a linear trend is restricted to the cointegrating space, allowing quadratic trends in levels. Critical values are tabulated separately for each case.
 
 #### JohansenResult Return Values
 

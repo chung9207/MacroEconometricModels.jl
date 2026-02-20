@@ -229,13 +229,14 @@ function _bvar_dummy_obs(Y0::AbstractMatrix{T}, lags::Int, sigma_ar::Vector{T},
         Y_d = zeros(T, N, N)
         X_d = zeros(T, N, k)
         for i in 1:N
+            # Diagonal (own-lag): standard Minnesota dummy
             Y_d[i, i] = sigma_ar[i] / (lambda * T(lag)^T(2))
             X_d[i, 1 + (lag - 1) * N + i] = sigma_ar[i] / (lambda * T(lag)^T(2))
-        end
-        # Cross-variable shrinkage
-        for i in 1:N, j in 1:N
-            if i != j
-                X_d[i, 1 + (lag - 1) * N + j] *= one(T) / theta
+            # Off-diagonal (cross-variable): shrunk by theta
+            for j in 1:N
+                if i != j
+                    X_d[i, 1 + (lag - 1) * N + j] = sigma_ar[i] / (theta * lambda * T(lag)^T(2))
+                end
             end
         end
         dummy_Y = vcat(dummy_Y, Y_d)

@@ -196,10 +196,12 @@ function _dfm_init_cond(xNaN::Matrix{T}, r::Int, p::Int, blocks::Matrix{Int},
     Lambda0 = eig.vectors[:, 1:n_eig]  # N × n_eig
 
     # Build state dimension
-    # State vector: [block_factors (r*n_blocks*p), idio_M (if ar1), idio_Q (5*nQ)]
+    # Mariano-Murasawa [1,2,3,2,1] requires 5 factor lags for quarterly variables
+    p_eff = nQ > 0 ? max(p, 5) : p
+    # State vector: [block_factors (r*n_blocks*p_eff), idio_M (if ar1), idio_Q (5*nQ)]
     n_idio_M = idio == :ar1 ? nM : 0
     n_idio_Q = 5 * nQ  # 5 states for quarterly temporal aggregation
-    state_dim = r * n_blocks * p + n_idio_M + n_idio_Q
+    state_dim = r * n_blocks * p_eff + n_idio_M + n_idio_Q
 
     # State transition matrix
     A = zeros(T, state_dim, state_dim)
@@ -220,15 +222,15 @@ function _dfm_init_cond(xNaN::Matrix{T}, r::Int, p::Int, blocks::Matrix{Int},
                 row_end = lag * n_f
                 A[1:n_f, row_start:row_end] = B_f[(1 + (lag - 1) * n_f + 1):(1 + lag * n_f), :]'
             end
-            # Companion form for lagged factors
-            if p > 1
-                A[(n_f + 1):(n_f * p), 1:(n_f * (p - 1))] = Matrix{T}(I, n_f * (p - 1), n_f * (p - 1))
+            # Companion form for all lagged factors (p_eff lags for temporal aggregation)
+            if p_eff > 1
+                A[(n_f + 1):(n_f * p_eff), 1:(n_f * (p_eff - 1))] = Matrix{T}(I, n_f * (p_eff - 1), n_f * (p_eff - 1))
             end
         end
     end
 
     n_f = min(n_eig, r * n_blocks)
-    factor_block_end = n_f * p
+    factor_block_end = n_f * p_eff
 
     # Idiosyncratic AR(1) for monthly variables
     if idio == :ar1
@@ -277,12 +279,13 @@ function _dfm_init_cond(xNaN::Matrix{T}, r::Int, p::Int, blocks::Matrix{Int},
         end
     end
 
-    # Quarterly loadings with [1 2 3 2 1] temporal aggregation
+    # Quarterly loadings with [1 2 3 2 1] Mariano-Murasawa temporal aggregation
+    mw_weights = T[1, 2, 3, 2, 1]
     for q in 1:nQ
         i = nM + q
         base = factor_block_end + n_idio_M + (q - 1) * 5
 
-        # Factor loadings via temporal aggregation
+        # Factor loadings via temporal aggregation on lagged factor states
         for b in 1:n_blocks
             if blocks[i, b] == 1
                 col_start = (b - 1) * r + 1
@@ -290,7 +293,13 @@ function _dfm_init_cond(xNaN::Matrix{T}, r::Int, p::Int, blocks::Matrix{Int},
                 if col_start <= n_f
                     for c in col_start:col_end
                         load = Lambda0[i, c]
-                        C[i, c] = T(3) * load  # Peak weight at current month
+                        # Apply [1,2,3,2,1] weights to f_t, f_{t-1}, ..., f_{t-4}
+                        for k in 0:4
+                            state_idx = k * n_f + c
+                            if state_idx <= n_f * p_eff
+                                C[i, state_idx] = mw_weights[k + 1] * load
+                            end
+                        end
                     end
                 end
             end
@@ -356,6 +365,7 @@ function _dfm_em_step(xNaN::Matrix{T}, A::Matrix{T}, C::Matrix{T},
     state_dim = size(A, 1)
     n_blocks = size(blocks, 2)
     n_f = min(r * n_blocks, state_dim)
+    p_eff = nQ > 0 ? max(p, 5) : p
 
     # E-step: Kalman smoother
     y_t = xNaN'  # N × T_obs
@@ -377,24 +387,24 @@ function _dfm_em_step(xNaN::Matrix{T}, A::Matrix{T}, C::Matrix{T},
         end
     end
 
-    # M-step: Update transition matrix A for factor block
+    # M-step: Update transition matrix A for factor block (VAR(p) coefficients only)
     if n_f >= 1 && T_obs > 1
-        factor_end = n_f * p
-        if factor_end <= state_dim
+        factor_var_end = n_f * p  # VAR(p) uses p lags (not p_eff)
+        if factor_var_end <= state_dim
             # Update factor VAR coefficients
             fi = 1:n_f
-            fi_all = 1:factor_end
-            EZZ_lag_f = EZZ_lag[fi, fi_all]
-            EZZ_prev_f = EZZ_prev[fi_all, fi_all]
-            EZZ_prev_reg = EZZ_prev_f + T(1e-8) * I(length(fi_all))
+            fi_var = 1:factor_var_end
+            EZZ_lag_f = EZZ_lag[fi, fi_var]
+            EZZ_prev_f = EZZ_prev[fi_var, fi_var]
+            EZZ_prev_reg = EZZ_prev_f + T(1e-8) * I(length(fi_var))
             A_new_f = EZZ_lag_f / EZZ_prev_reg
-            A[fi, fi_all] = A_new_f
+            A[fi, fi_var] = A_new_f
         end
     end
 
     # M-step: Update idiosyncratic AR(1) coefficients
     n_idio_M = idio == :ar1 ? nM : 0
-    factor_block_end = n_f * p
+    factor_block_end = n_f * p_eff  # Full factor block includes temporal aggregation lags
     if idio == :ar1
         for i in 1:nM
             idx = factor_block_end + i
@@ -409,7 +419,8 @@ function _dfm_em_step(xNaN::Matrix{T}, A::Matrix{T}, C::Matrix{T},
     # M-step: Update factor noise covariance Q
     if n_f >= 1
         fi = 1:n_f
-        Q_new = (EZZ[fi, fi] - A[fi, 1:(n_f * p)] * EZZ_lag[fi, 1:(n_f * p)]') / T(T_obs)
+        factor_var_end = n_f * p
+        Q_new = (EZZ[fi, fi] - A[fi, 1:factor_var_end] * EZZ_lag[fi, 1:factor_var_end]') / T(T_obs)
         Q_new = (Q_new + Q_new') / T(2)  # Symmetrize
         for i in fi
             Q[i, i] = max(Q_new[i, i], T(1e-6))
@@ -471,9 +482,9 @@ function _dfm_em_step(xNaN::Matrix{T}, A::Matrix{T}, C::Matrix{T},
             zz_reg = zz + T(1e-8) * I(length(load_idx))
             C[i, load_idx] = zz_reg \ xz
         else
-            # Quarterly variable: loadings constrained by temporal aggregation
-            # Only update factor loadings, keep [1 2 3 2 1] structure fixed
-            q_num = i - nM
+            # Quarterly variable: Mariano-Murasawa [1,2,3,2,1] constrained loadings
+            # Estimate base loading Lambda_i via OLS on aggregated factor
+            mw_w = T[1, 2, 3, 2, 1]
             load_idx = Int[]
             for b in 1:n_blocks
                 if blocks[i, b] == 1
@@ -482,16 +493,50 @@ function _dfm_em_step(xNaN::Matrix{T}, A::Matrix{T}, C::Matrix{T},
             end
             isempty(load_idx) && continue
 
-            xz = zeros(T, length(load_idx))
-            zz = zeros(T, length(load_idx), length(load_idx))
+            n_load = length(load_idx)
+            # Compute aggregated factor: z_agg[c] = sum_k w_k * f_{t-k}[c]
+            xz = zeros(T, n_load)
+            zz = zeros(T, n_load, n_load)
             for t in obs_t
-                z_t = x_smooth[load_idx, t]
-                xz += xNaN[t, i] * z_t
-                zz += P_smooth[load_idx, load_idx, t] + z_t * z_t'
+                # Aggregated smoothed factor mean
+                z_agg = zeros(T, n_load)
+                for (ci, c) in enumerate(load_idx)
+                    for k in 0:4
+                        s_idx = k * n_f + c
+                        if s_idx <= state_dim
+                            z_agg[ci] += mw_w[k + 1] * x_smooth[s_idx, t]
+                        end
+                    end
+                end
+                # Aggregated covariance
+                P_agg = zeros(T, n_load, n_load)
+                for (ci1, c1) in enumerate(load_idx)
+                    for (ci2, c2) in enumerate(load_idx)
+                        for k1 in 0:4, k2 in 0:4
+                            s1 = k1 * n_f + c1
+                            s2 = k2 * n_f + c2
+                            if s1 <= state_dim && s2 <= state_dim
+                                P_agg[ci1, ci2] += mw_w[k1 + 1] * mw_w[k2 + 1] * P_smooth[s1, s2, t]
+                            end
+                        end
+                    end
+                end
+                xz += xNaN[t, i] * z_agg
+                zz += P_agg + z_agg * z_agg'
             end
-            zz_reg = zz + T(1e-8) * I(length(load_idx))
-            c_new = zz_reg \ xz
-            C[i, load_idx] = c_new
+            zz_reg = zz + T(1e-8) * I(n_load)
+            Lambda_i = zz_reg \ xz
+
+            # Write structured loadings: C[i, k*n_f + c] = w_k * Lambda_i[c]
+            # First clear old factor loadings
+            for k in 0:4
+                for (ci, c) in enumerate(load_idx)
+                    s_idx = k * n_f + c
+                    if s_idx <= state_dim
+                        C[i, s_idx] = mw_w[k + 1] * Lambda_i[ci]
+                    end
+                end
+            end
         end
     end
 

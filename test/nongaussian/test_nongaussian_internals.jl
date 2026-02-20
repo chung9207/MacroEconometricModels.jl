@@ -270,7 +270,7 @@ const MEM = MacroEconometricModels
 
     @testset "_n_dist_params" begin
         @test MEM._n_dist_params(:student_t) == 1
-        @test MEM._n_dist_params(:mixture_normal) == 3
+        @test MEM._n_dist_params(:mixture_normal) == 2
         @test MEM._n_dist_params(:pml) == 2
         @test MEM._n_dist_params(:skew_normal) == 1
         @test_throws ArgumentError MEM._n_dist_params(:unknown)
@@ -393,12 +393,17 @@ const MEM = MacroEconometricModels
         Random.seed!(7033)
         T_obs = 50
         n = 2
+        K = 2
         U = randn(T_obs, n)
-        probs = hcat(rand(T_obs), rand(T_obs))
-        probs ./= sum(probs, dims=2)  # normalize rows
+        # Build proper filtered/predicted/smoothed probabilities via Hamilton filter
+        Sigma1 = U' * U / T_obs + I
+        Sigma2 = 2 * U' * U / T_obs + I
+        P = [0.9 0.1; 0.1 0.9]
+        filtered, predicted, _ = MEM._hamilton_filter(U, [Sigma1, Sigma2], P)
+        smoothed = MEM._hamilton_smoother(filtered, predicted, P)
 
-        Sigma_new, P_new = MEM._ms_em_step(U, probs, 2)
-        @test length(Sigma_new) == 2
+        Sigma_new, P_new = MEM._ms_em_step(U, smoothed, filtered, predicted, P, K)
+        @test length(Sigma_new) == K
         @test all(size(S) == (n, n) for S in Sigma_new)
         # Covariance matrices should be PSD
         for S in Sigma_new

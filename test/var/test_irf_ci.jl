@@ -261,7 +261,42 @@ using Statistics
     end
 
     # =========================================================================
-    # 8. Bayesian IRF with posterior credible intervals
+    # 8. Stationarity Filtering (Issue #45)
+    # =========================================================================
+
+    @testset "stationary_only - Bootstrap" begin
+        Random.seed!(12361)
+        # Standard model should have most draws stationary
+        irf_stat = irf(model, H; method=:cholesky, ci_type=:bootstrap, reps=50,
+                       conf_level=0.90, stationary_only=true)
+        @test irf_stat isa ImpulseResponse
+        @test size(irf_stat.values) == (H, n, n)
+        @test all(irf_stat.ci_lower .<= irf_stat.ci_upper)
+
+        # Draws should be stored and all should be from stationary models
+        @test irf_stat._draws !== nothing
+        @test size(irf_stat._draws, 1) > 0
+    end
+
+    @testset "stationary_only - Theoretical" begin
+        Random.seed!(12362)
+        irf_stat_theo = irf(model, H; method=:cholesky, ci_type=:theoretical, reps=50,
+                            conf_level=0.90, stationary_only=true)
+        @test irf_stat_theo isa ImpulseResponse
+        @test all(irf_stat_theo.ci_lower .<= irf_stat_theo.ci_upper)
+    end
+
+    @testset "stationary_only=false is default" begin
+        Random.seed!(12363)
+        irf_default = irf(model, H; method=:cholesky, ci_type=:bootstrap, reps=50, conf_level=0.90)
+        @test irf_default isa ImpulseResponse
+        # Default behavior should work as before
+        @test irf_default._draws !== nothing
+        @test size(irf_default._draws, 1) == 50
+    end
+
+    # =========================================================================
+    # 9. Bayesian IRF with posterior credible intervals
     # =========================================================================
 
     @testset "Bayesian IRF - Credible Intervals" begin

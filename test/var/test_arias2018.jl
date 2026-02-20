@@ -1290,6 +1290,65 @@ end
         @test isapprox(lve, 0.0, atol=1e-4)
     end
 
+    @testset "_compute_qr_signs" begin
+        Random.seed!(50505)
+        T_obs, n, p = 200, 3, 1
+        Y = randn(T_obs, n)
+        model = estimate_var(Y, p)
+
+        zrs = [zero_restriction(2, 1)]
+        restrictions = SVARRestrictions(n; zeros=zrs)
+
+        Phi = MacroEconometricModels._compute_ma_coefficients(model, 1)
+        L = safe_cholesky(model.Sigma)
+        setup = MacroEconometricModels._AriasSVARSetup(restrictions, n, Float64)
+
+        Q = MacroEconometricModels._draw_Q_with_zero_restrictions(restrictions, Phi, L)
+        signs = MacroEconometricModels._compute_qr_signs(Q, setup, restrictions, Phi, L)
+
+        @test length(signs) == n
+        for j in 1:n
+            @test all(s -> s == 1 || s == -1, signs[j])
+        end
+
+        # Using ref_signs should give same w as without
+        w_default = MacroEconometricModels._Q_to_spheres(Q, setup, restrictions, Phi, L)
+        w_ref = MacroEconometricModels._Q_to_spheres(Q, setup, restrictions, Phi, L; ref_signs=signs)
+        @test w_default ≈ w_ref
+    end
+
+    @testset "ff_h Jacobian smoothness (Issue #37)" begin
+        Random.seed!(51515)
+        T_obs, n, p = 200, 3, 1
+        Y = randn(T_obs, n)
+        model = estimate_var(Y, p)
+
+        zrs = [zero_restriction(2, 1), zero_restriction(3, 1)]
+        restrictions = SVARRestrictions(n; zeros=zrs)
+
+        Phi = MacroEconometricModels._compute_ma_coefficients(model, 1)
+        L = safe_cholesky(model.Sigma)
+        setup = MacroEconometricModels._AriasSVARSetup(restrictions, n, Float64)
+        Q = MacroEconometricModels._draw_Q_with_zero_restrictions(restrictions, Phi, L)
+
+        m_size = size(model.B, 1)
+        A0, Aplus = MacroEconometricModels._rf_to_struct(model.B, L, Q)
+        structpara = MacroEconometricModels._pack_structural(A0, Aplus)
+
+        max_h = maximum(zr.horizon for zr in restrictions.zeros)
+        ff_h = MacroEconometricModels._build_ff_h(setup, restrictions, n, m_size, p, max_h)
+
+        # Jacobian should be finite and well-conditioned
+        J = MacroEconometricModels._numerical_jacobian(ff_h, structpara)
+        @test all(isfinite, J)
+        @test !any(isnan, J)
+
+        # Verify that the volume element is finite
+        zero_fn = MacroEconometricModels._build_zero_restrictions_fn(restrictions, n, m_size, p, max_h, Float64)
+        lve = MacroEconometricModels._log_volume_element(ff_h, structpara, zero_fn)
+        @test isfinite(lve)
+    end
+
     @testset "_draw_w" begin
         Random.seed!(49494)
 

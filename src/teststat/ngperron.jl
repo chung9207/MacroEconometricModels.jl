@@ -85,19 +85,21 @@ function ngperron_test(y::AbstractVector{T};
 
     # Compute statistics
     # Autoregressive spectral density estimate at frequency zero
+    # Ng & Perron (2001, Table 1): fit AR(k) to FIRST DIFFERENCES of GLS-detrended series
     k = floor(Int, 4 * (n / 100)^(2/9))  # MAIC bandwidth
 
-    # AR(k) regression for spectral density
-    if k > 0 && n > k + 5
-        Y_ar = y_d[(k+1):end]
-        X_ar = hcat([y_d[(k+1-j):(end-j)] for j in 1:k]...)
+    # AR(k) regression on first differences of detrended series for spectral density
+    dy_d = diff(y_d)
+    if k > 0 && length(dy_d) > k + 5
+        Y_ar = dy_d[(k+1):end]
+        X_ar = hcat([dy_d[(k+1-j):(end-j)] for j in 1:k]...)
         rho_ar = X_ar \ Y_ar
         resid_ar = Y_ar - X_ar * rho_ar
         s2 = var(resid_ar; corrected=true)
         ar_sum = 1 - sum(rho_ar)
         s2_ar = s2 / ar_sum^2
     else
-        s2_ar = var(y_d; corrected=true)
+        s2_ar = var(dy_d; corrected=true)
     end
 
     # Components for statistics

@@ -256,10 +256,18 @@ using Statistics
         result_trend = ngperron_test(y_stationary; regression=:trend)
         @test result_trend.regression == :trend
 
-        # Test with random walk
+        # Test with random walk — should fail to reject (MZa near zero)
         y_rw = generate_random_walk(150)
         result_rw = ngperron_test(y_rw)
         @test result_rw isa NgPerronResult
+        # MZa should not be strongly negative for a unit root process
+        @test result_rw.MZa > result_rw.critical_values[:MZa][1]  # above 1% CV
+
+        # MSB should be positive
+        @test result_rw.MSB > zero(result_rw.MSB)
+
+        # MPT should be positive
+        @test result_rw.MPT > zero(result_rw.MPT)
     end
 
     # ==========================================================================
@@ -303,12 +311,27 @@ using Statistics
         # All eigenvalues should be in [0, 1]
         @test all(0 .<= result.eigenvalues .<= 1)
 
+        # Test statistics should be non-negative
+        @test all(result.trace_stats .>= 0)
+        @test all(result.max_eigen_stats .>= 0)
+
+        # Trace stats should be monotonically decreasing
+        for i in 1:(n-1)
+            @test result.trace_stats[i] >= result.trace_stats[i+1]
+        end
+
         # Test different deterministic specifications
         result_none = johansen_test(Y, 2; deterministic=:none)
         @test result_none.deterministic == :none
+        @test length(result_none.eigenvalues) == n
 
         result_trend = johansen_test(Y, 2; deterministic=:trend)
         @test result_trend.deterministic == :trend
+        @test length(result_trend.eigenvalues) == n
+
+        # Different deterministic specs should produce different critical values
+        @test result.critical_values_trace[1, 2] != result_none.critical_values_trace[1, 2]
+        @test result_trend.critical_values_trace[1, 2] != result.critical_values_trace[1, 2]
 
         # Test error handling
         @test_throws ArgumentError johansen_test(Y, 0)  # Invalid lags

@@ -144,6 +144,7 @@ function _sample_direct(Y::Matrix{T}, p::Int, n::Int, k::Int, n_draws::Int,
 
     # Cholesky of V_post for efficient sampling
     L_V = safe_cholesky(V_post)
+    Z_buf = Matrix{T}(undef, k, n)
 
     for s in 1:n_draws
         # Step 1: Draw Σ ~ IW(ν_post, S_post)
@@ -153,8 +154,8 @@ function _sample_direct(Y::Matrix{T}, p::Int, n::Int, k::Int, n_draws::Int,
         #   vec(B) ~ N(vec(B_post), Σ ⊗ V_post)
         #   Efficient: B = B_post + L_V * Z * L_Σ' where Z ~ N(0, I_{k×n})
         L_Sigma = safe_cholesky(Sigma)
-        Z = randn(T, k, n)
-        B = B_post + L_V * Z * L_Sigma'
+        randn!(Z_buf)
+        B = B_post + L_V * Z_buf * L_Sigma'
 
         B_draws[s, :, :] = B
         Sigma_draws[s, :, :] = Sigma
@@ -184,22 +185,25 @@ function _sample_gibbs(Y::Matrix{T}, p::Int, n::Int, k::Int,
     Sigma_curr = (resid' * resid) / size(Y_data, 1)
     Sigma_curr = T(0.5) * (Sigma_curr + Sigma_curr')
 
+    # Posterior for B | Σ, Y — depends only on data (XtX, V0_inv, B0), not Σ
     XtX = X_data' * X_data
+    V_post_inv = XtX + V0_inv
+    V_post = robust_inv(V_post_inv)
+    V_post = T(0.5) * (V_post + V_post')
+    B_post = V_post * (X_data' * Y_data + V0_inv * B0)
+    L_V = safe_cholesky(V_post)
+
+    # Pre-allocate MCMC workspace
+    Z_buf = Matrix{T}(undef, k, n)
 
     total_iters = burnin + n_draws * thin
     draw_idx = 0
 
     for s in 1:total_iters
         # Block 1: Draw B | Σ, Y
-        V_post_inv = XtX + V0_inv
-        V_post = robust_inv(V_post_inv)
-        V_post = T(0.5) * (V_post + V_post')
-        B_post = V_post * (X_data' * Y_data + V0_inv * B0)
-
-        L_V = safe_cholesky(V_post)
         L_Sigma = safe_cholesky(Sigma_curr)
-        Z = randn(T, k, n)
-        B_curr = B_post + L_V * Z * L_Sigma'
+        randn!(Z_buf)
+        B_curr = B_post + L_V * Z_buf * L_Sigma'
 
         # Block 2: Draw Σ | B, Y
         resid = Y_data - X_data * B_curr

@@ -319,14 +319,19 @@ function _hamilton_smoother(filtered_probs::Matrix{T}, predicted_probs::Matrix{T
     smoothed
 end
 
-"""EM step for Markov-switching covariances and transition matrix."""
-function _ms_em_step(U::Matrix{T}, probs::Matrix{T}, K::Int) where {T<:AbstractFloat}
+"""EM step for Markov-switching covariances and transition matrix.
+
+Uses Kim (1994) joint smoothed probabilities for the transition matrix update:
+  ξ_{t-1,t|T}(i,j) = ξ_{t|T}(j) · P[i,j] · ξ_{t-1|t-1}(i) / ξ_{t|t-1}(j)
+"""
+function _ms_em_step(U::Matrix{T}, smoothed::Matrix{T}, filtered::Matrix{T},
+                      predicted::Matrix{T}, P::Matrix{T}, K::Int) where {T<:AbstractFloat}
     T_obs, n = size(U)
 
-    # Update covariance matrices
+    # Update covariance matrices (uses smoothed probabilities as weights)
     Sigma_new = Vector{Matrix{T}}(undef, K)
     for k in 1:K
-        w = max.(probs[:, k], eps(T))
+        w = max.(smoothed[:, k], eps(T))
         w_sum = sum(w)
         Sigma_k = zeros(T, n, n)
         for t in 1:T_obs
@@ -338,14 +343,17 @@ function _ms_em_step(U::Matrix{T}, probs::Matrix{T}, K::Int) where {T<:AbstractF
         Sigma_new[k] = Sigma_new[k] + eps(T) * I
     end
 
-    # Update transition matrix
+    # Update transition matrix using Kim (1994) / Hamilton (1994 Ch.22)
+    # joint smoothed probabilities instead of marginal products
     P_new = zeros(T, K, K)
-    for i in 1:K, j in 1:K
-        num = zero(T)
-        for t in 2:T_obs
-            num += probs[t-1, i] * probs[t, j]
+    for t in 2:T_obs
+        for i in 1:K
+            for j in 1:K
+                pred_j = max(predicted[t, j], eps(T))
+                joint_ij = smoothed[t, j] * P[i, j] * filtered[t-1, i] / pred_j
+                P_new[i, j] += joint_ij
+            end
         end
-        P_new[i, j] = num
     end
     # Normalize rows
     for i in 1:K
@@ -419,7 +427,7 @@ function identify_markov_switching(model::VARModel{T}; n_regimes::Int=2,
         loglik_old = loglik
 
         # M-step
-        Sigma_regimes, P = _ms_em_step(model.U, smoothed, K)
+        Sigma_regimes, P = _ms_em_step(model.U, smoothed, filtered, predicted, P, K)
     end
 
     # Final filter for smoothed probabilities
@@ -519,10 +527,16 @@ function identify_garch(model::VARModel{T}; max_iter::Int=500,
     n = nvars(model)
     T_obs = size(model.U, 1)
 
-    # Initialize with Cholesky
+    # Initialize with Cholesky: B₀ = L * Q(θ), start at Q = I (θ = 0)
     L = safe_cholesky(model.Sigma)
-    B0 = Matrix(L)
-    Q = Matrix{T}(I, n, n)
+    L_mat = Matrix(L)
+    n_angles = n * (n - 1) ÷ 2
+    angles = zeros(T, n_angles)
+    log_det_B0_inv = -sum(log(L_mat[i, i]) for i in 1:n)
+
+    # Precompute whitened residuals: Z = U * L⁻ᵀ, so shocks = Z * Q
+    L_inv_t = Matrix{T}(robust_inv(L_mat)')
+    Z = model.U * L_inv_t
 
     garch_params = zeros(T, n, 3)
     cond_var = ones(T, T_obs, n)
@@ -533,24 +547,23 @@ function identify_garch(model::VARModel{T}; max_iter::Int=500,
     for it in 1:max_iter
         iter = it
 
-        # Compute structural shocks
-        B0_inv = robust_inv(B0)
-        shocks = (B0_inv * model.U')'
+        # Build B₀ from current Givens angles, compute structural shocks
+        Q = _givens_to_orthogonal(angles, n)
+        shocks = Z * Q
 
-        # Fit GARCH(1,1) to each shock
+        # Fit GARCH(1,1) to each structural shock series
         loglik = zero(T)
         for j in 1:n
-            eps_sq = shocks[:, j] .^ 2
-            omega, alpha, beta, h = _estimate_garch11(eps_sq)
+            resid_sq = shocks[:, j] .^ 2
+            omega, alpha, beta, h = _estimate_garch11(resid_sq)
             garch_params[j, :] = [omega, alpha, beta]
             cond_var[:, j] = h
 
-            # Contribution to log-likelihood
             for t in 1:T_obs
-                loglik -= T(0.5) * (log(T(2π)) + log(h[t]) + eps_sq[t] / h[t])
+                loglik -= T(0.5) * (log(T(2π)) + log(h[t]) + resid_sq[t] / h[t])
             end
         end
-        loglik += T_obs * log(max(abs(det(B0_inv)), eps(T)))
+        loglik += T_obs * log_det_B0_inv
 
         # Check convergence
         if abs(loglik - loglik_old) < tol * abs(loglik_old + one(T))
@@ -559,29 +572,36 @@ function identify_garch(model::VARModel{T}; max_iter::Int=500,
         end
         loglik_old = loglik
 
-        # Re-estimate B₀ using weighted covariances
-        # Use time-varying Σ_t = B₀ diag(h_t) B₀'
-        # Simplified: use two sub-periods with different volatilities
-        mid = T_obs ÷ 2
-        Sigma1 = zeros(T, n, n)
-        Sigma2 = zeros(T, n, n)
-        for t in 1:mid
-            u = @view model.U[t, :]
-            Sigma1 .+= u * u'
+        # Re-estimate B₀ by optimizing Givens angles with fixed GARCH variances.
+        # Since |det(Q)| = 1, the log-det term is constant w.r.t. θ.
+        # The log(h) terms are also fixed. Only the weighted residual sum varies.
+        if n_angles > 0
+            obj = theta -> begin
+                Q_t = _givens_to_orthogonal(theta, n)
+                shocks_t = Z * Q_t
+                val = zero(T)
+                for t in 1:T_obs
+                    for j in 1:n
+                        val += shocks_t[t, j]^2 / cond_var[t, j]
+                    end
+                end
+                val
+            end
+            result_opt = Optim.optimize(obj, angles, Optim.NelderMead(),
+                                        Optim.Options(iterations=200))
+            angles = Optim.minimizer(result_opt)
         end
-        for t in (mid+1):T_obs
-            u = @view model.U[t, :]
-            Sigma2 .+= u * u'
-        end
-        Sigma1 ./= mid
-        Sigma2 ./= (T_obs - mid)
-
-        B0_new, Q_new, _ = _eigendecomposition_id(Sigma1, Sigma2)
-        B0 = B0_new
-        Q = Q_new
     end
 
-    # Final shocks
+    # Final B₀ and Q with sign normalization
+    Q = _givens_to_orthogonal(angles, n)
+    B0 = L_mat * Q
+    for j in 1:n
+        if B0[j, j] < 0
+            B0[:, j] *= -one(T)
+            Q[:, j] *= -one(T)
+        end
+    end
     B0_inv = robust_inv(B0)
     shocks = (B0_inv * model.U')'
 

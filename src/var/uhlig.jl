@@ -339,54 +339,68 @@ function identify_uhlig(model::VARModel{T}, restrictions::SVARRestrictions, hori
     obj = theta -> _uhlig_penalty(theta, restrictions, Phi, L, model, max_h, n)
 
     # =========================================================================
-    # Phase 1: Coarse search from random starting points
+    # Phase 1: Coarse search from random starting points (multi-threaded)
     # =========================================================================
-    best_val = T(Inf)
-    best_theta = zeros(T, n_params)
+    results_phase1 = Vector{Tuple{T, Vector{T}}}(undef, n_starts)
+    fill!(results_phase1, (T(Inf), zeros(T, n_params)))
 
-    for _ in 1:n_starts
+    Threads.@threads for i in 1:n_starts
         theta0 = rand(T, n_params) .* T(2π)
 
-        result = try
+        res = try
             Optim.optimize(obj, theta0, Optim.NelderMead(),
                 Optim.Options(iterations=max_iter_coarse,
                               f_reltol=tol_coarse))
         catch
-            continue
+            nothing
         end
 
-        val = Optim.minimum(result)
-        if isfinite(val) && val < best_val
-            best_val = val
-            best_theta = Optim.minimizer(result)
+        if res !== nothing
+            val = Optim.minimum(res)
+            if isfinite(val)
+                results_phase1[i] = (val, Optim.minimizer(res))
+            end
         end
     end
 
+    best_idx = argmin(first.(results_phase1))
+    best_val, best_theta = results_phase1[best_idx]
     best_val == T(Inf) && error("All starting points failed in Phase 1")
 
     # =========================================================================
-    # Phase 2: Local refinement from best solution
+    # Phase 2: Local refinement from best solution (multi-threaded)
     # =========================================================================
-    for i in 1:n_refine
-        # Perturb best solution slightly for diversity
-        if i == 1
-            theta0 = copy(best_theta)
+    results_phase2 = Vector{Tuple{T, Vector{T}}}(undef, n_refine)
+    fill!(results_phase2, (T(Inf), zeros(T, n_params)))
+    best_theta_snap = copy(best_theta)
+
+    Threads.@threads for i in 1:n_refine
+        theta0 = if i == 1
+            copy(best_theta_snap)
         else
-            theta0 = best_theta .+ T(0.01) .* randn(T, n_params)
+            best_theta_snap .+ T(0.01) .* randn(T, n_params)
         end
 
-        result = try
+        res = try
             Optim.optimize(obj, theta0, Optim.NelderMead(),
                 Optim.Options(iterations=max_iter_fine,
                               f_reltol=tol_fine))
         catch
-            continue
+            nothing
         end
 
-        val = Optim.minimum(result)
-        if isfinite(val) && val < best_val
+        if res !== nothing
+            val = Optim.minimum(res)
+            if isfinite(val)
+                results_phase2[i] = (val, Optim.minimizer(res))
+            end
+        end
+    end
+
+    for (val, theta) in results_phase2
+        if val < best_val
             best_val = val
-            best_theta = Optim.minimizer(result)
+            best_theta = theta
         end
     end
 

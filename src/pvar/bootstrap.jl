@@ -78,9 +78,17 @@ function pvar_bootstrap_irf(model::PVARModel{T}, H::Int;
     predet_names = model.predet_names
     exog_names = model.exog_names
 
-    for b in 1:n_draws
+    # Pre-index group rows to avoid repeated mask computation
+    group_rows = [findall(d.group_id .== g) for g in 1:N]
+
+    # Pre-generate seeds for thread-safe RNG (must be done before threaded loop)
+    boot_seeds = rand(rng, UInt64, n_draws)
+
+    Threads.@threads for b in 1:n_draws
+        local_rng = Random.MersenneTwister(boot_seeds[b])
+
         # Resample groups with replacement
-        sampled_groups = rand(rng, 1:N, N)
+        sampled_groups = rand(local_rng, 1:N, N)
 
         # Build new PanelData from resampled groups
         new_data = Matrix{T}(undef, 0, nvars(d))
@@ -88,9 +96,8 @@ function pvar_bootstrap_irf(model::PVARModel{T}, H::Int;
         new_tid = Int[]
 
         for (new_g, orig_g) in enumerate(sampled_groups)
-            mask = d.group_id .== orig_g
-            rows = d.data[mask, :]
-            tids = d.time_id[mask]
+            rows = d.data[group_rows[orig_g], :]
+            tids = d.time_id[group_rows[orig_g]]
             new_data = vcat(new_data, rows)
             append!(new_gid, fill(new_g, size(rows, 1)))
             append!(new_tid, tids)

@@ -191,13 +191,15 @@ function _nongaussian_loglik(angles::AbstractVector{T}, dist_params_vec::Abstrac
         end
     elseif distribution == :mixture_normal
         for j in 1:n
-            idx = (j - 1) * 3
+            idx = (j - 1) * 2
             p_mix = one(T) / (one(T) + exp(-dist_params_vec[idx + 1]))  # logistic transform
-            log_s1 = dist_params_vec[idx + 2]
-            sigma1 = exp(log_s1)
-            # Enforce unit variance: p σ₁² + (1-p) σ₂² = 1
-            sigma2_sq = (one(T) - p_mix * sigma1^2) / max(one(T) - p_mix, eps(T))
-            sigma2 = sigma2_sq > zero(T) ? sqrt(sigma2_sq) : eps(T)
+            sigma1_raw = dist_params_vec[idx + 2]
+            # Bound σ₁² ∈ (0, 1/p) via sigmoid so σ₂² > 0 is guaranteed
+            sigma1_sq = (one(T) / p_mix) * (one(T) / (one(T) + exp(-sigma1_raw)))
+            sigma1 = sqrt(sigma1_sq)
+            # Unit variance constraint: p σ₁² + (1-p) σ₂² = 1
+            sigma2_sq = (one(T) - p_mix * sigma1_sq) / (one(T) - p_mix)
+            sigma2 = sqrt(sigma2_sq)
             for t in 1:T_obs
                 loglik += _mixture_normal_logpdf(shocks[t, j], p_mix, sigma1, sigma2)
             end
@@ -243,7 +245,7 @@ end
 """Determine number of distribution parameters per shock."""
 function _n_dist_params(distribution::Symbol)
     distribution == :student_t ? 1 :
-    distribution == :mixture_normal ? 3 :
+    distribution == :mixture_normal ? 2 :
     distribution == :pml ? 2 :
     distribution == :skew_normal ? 1 :
     throw(ArgumentError("Unknown distribution: $distribution"))
@@ -342,7 +344,7 @@ function _estimate_nongaussian_ml(model::VARModel{T}, distribution::Symbol;
         if distribution == :student_t
             dist_params0 = fill(log(T(5.0) - T(2.01)), n)  # ν ≈ 5
         elseif distribution == :mixture_normal
-            dist_params0 = repeat([T(0.0), T(0.0), T(0.0)], n)  # logistic(0)=0.5, log(1)=0
+            dist_params0 = repeat([T(0.0), T(0.0)], n)  # p=0.5, σ₁²=σ₂²=1 at sigmoid(0)=0.5
         elseif distribution == :pml
             dist_params0 = repeat([T(0.0), log(T(5.0) - T(2.01))], n)  # κ=0, ν≈5
         elseif distribution == :skew_normal
@@ -383,8 +385,10 @@ function _estimate_nongaussian_ml(model::VARModel{T}, distribution::Symbol;
     if distribution == :student_t
         dp_dict[:nu] = [max(exp(dp_opt[j]) + T(2.01), T(2.01)) for j in 1:n]
     elseif distribution == :mixture_normal
-        dp_dict[:p_mix] = [one(T) / (one(T) + exp(-dp_opt[(j-1)*3+1])) for j in 1:n]
-        dp_dict[:sigma1] = [exp(dp_opt[(j-1)*3+2]) for j in 1:n]
+        p_mix_vals = [one(T) / (one(T) + exp(-dp_opt[(j-1)*2+1])) for j in 1:n]
+        dp_dict[:p_mix] = p_mix_vals
+        dp_dict[:sigma1] = [sqrt((one(T) / p_mix_vals[j]) *
+                            (one(T) / (one(T) + exp(-dp_opt[(j-1)*2+2])))) for j in 1:n]
     elseif distribution == :pml
         dp_dict[:kappa] = [dp_opt[(j-1)*2+1] for j in 1:n]
         dp_dict[:nu] = [max(exp(dp_opt[(j-1)*2+2]) + T(2.01), T(2.01)) for j in 1:n]

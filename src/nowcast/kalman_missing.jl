@@ -108,7 +108,7 @@ function _kalman_filter_missing(y::AbstractMatrix{T}, A::AbstractMatrix{T},
             # Innovation
             v_t = y_obs - C_obs * x_pred[:, t]
             F_t = Symmetric(C_obs * P_pred[:, :, t] * C_obs' + R_obs)
-            F_inv = try inv(F_t) catch; pinv(Matrix{T}(F_t)) end
+            F_inv = robust_inv(F_t)
             K_t = P_pred[:, :, t] * C_obs' * F_inv
 
             # Update
@@ -167,11 +167,7 @@ function _kalman_smoother_missing(y::AbstractMatrix{T}, A::AbstractMatrix{T},
     P_smooth[:, :, T_obs] = P_filt[:, :, T_obs]
 
     for t in (T_obs - 1):-1:1
-        P_pred_inv = try
-            inv(Symmetric(P_pred[:, :, t + 1]))
-        catch
-            pinv(Matrix{T}(P_pred[:, :, t + 1]))
-        end
+        P_pred_inv = robust_inv(P_pred[:, :, t + 1])
         J_t = P_filt[:, :, t] * A' * P_pred_inv
 
         x_smooth[:, t] = x_filt[:, t] + J_t * (x_smooth[:, t + 1] - x_pred[:, t + 1])
@@ -183,11 +179,7 @@ function _kalman_smoother_missing(y::AbstractMatrix{T}, A::AbstractMatrix{T},
 
     # First time step cross-covariance (using initial conditions)
     P0_mat = Matrix{T}(P0)
-    P_pred_1_inv = try
-        inv(Symmetric(P_pred[:, :, 1]))
-    catch
-        pinv(Matrix{T}(P_pred[:, :, 1]))
-    end
+    P_pred_1_inv = robust_inv(P_pred[:, :, 1])
     J_0 = P0_mat * A' * P_pred_1_inv
     PP_smooth[:, :, 1] = P_smooth[:, :, 1] * J_0' + x_smooth[:, 1] * x0'
 
@@ -231,11 +223,7 @@ function _kalman_smoother_lag(y::AbstractMatrix{T}, A::AbstractMatrix{T},
     P_smooth[:, :, T_obs] = P_filt[:, :, T_obs]
 
     for t in (T_obs - 1):-1:1
-        P_pred_inv = try
-            inv(Symmetric(P_pred[:, :, t + 1]))
-        catch
-            pinv(Matrix{T}(P_pred[:, :, t + 1]))
-        end
+        P_pred_inv = robust_inv(P_pred[:, :, t + 1])
         J[:, :, t] = P_filt[:, :, t] * A' * P_pred_inv
         x_smooth[:, t] = x_filt[:, t] + J[:, :, t] * (x_smooth[:, t + 1] - x_pred[:, t + 1])
         P_smooth[:, :, t] = P_filt[:, :, t] + J[:, :, t] * (P_smooth[:, :, t + 1] - P_pred[:, :, t + 1]) * J[:, :, t]'

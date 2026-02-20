@@ -78,13 +78,15 @@ const NGPERRON_CRITICAL_VALUES = Dict(
 
 # Johansen critical values (Osterwald-Lenum 1992)
 # Format: [10%, 5%, 1%] for each n-r (number of common trends)
-# Trace test critical values (constant in cointegrating relation)
-const JOHANSEN_TRACE_CV_CONSTANT = Dict(
-    1 => [6.50, 8.18, 11.65],
-    2 => [15.66, 17.95, 23.52],
-    3 => [28.71, 31.52, 37.22],
-    4 => [45.23, 48.28, 55.43],
-    5 => [66.49, 70.60, 78.87],
+
+# Case 1 (:none) — No deterministic terms
+# Trace test critical values
+const JOHANSEN_TRACE_CV_NONE = Dict(
+    1 => [2.69, 3.84, 6.63],
+    2 => [13.33, 15.41, 20.04],
+    3 => [26.79, 29.68, 35.65],
+    4 => [43.95, 47.21, 54.46],
+    5 => [64.84, 68.52, 76.07],
     6 => [85.18, 90.39, 104.20],
     7 => [118.99, 124.25, 136.06],
     8 => [151.38, 157.11, 168.92],
@@ -92,16 +94,74 @@ const JOHANSEN_TRACE_CV_CONSTANT = Dict(
     10 => [224.63, 231.26, 247.18]
 )
 
-# Max eigenvalue test critical values
-const JOHANSEN_MAX_CV_CONSTANT = Dict(
-    1 => [6.50, 8.18, 11.65],
-    2 => [12.91, 14.90, 19.19],
-    3 => [18.90, 21.07, 25.75],
-    4 => [24.78, 27.14, 32.14],
-    5 => [30.84, 33.32, 38.78],
+# Case 1 — Max eigenvalue test critical values
+const JOHANSEN_MAX_CV_NONE = Dict(
+    1 => [2.69, 3.84, 6.63],
+    2 => [12.07, 14.07, 18.63],
+    3 => [18.60, 20.97, 25.52],
+    4 => [24.73, 27.07, 32.24],
+    5 => [30.67, 33.46, 38.77],
     6 => [36.25, 39.43, 44.59],
     7 => [42.06, 45.28, 51.30],
     8 => [48.43, 51.42, 57.07],
     9 => [54.01, 57.12, 62.80],
     10 => [59.00, 62.81, 68.83]
+)
+
+# Case 2 (:constant) — Restricted constant in cointegrating relation
+# Trace test critical values (Osterwald-Lenum 1992, Table 1*)
+const JOHANSEN_TRACE_CV_CONSTANT = Dict(
+    1 => [7.52, 9.24, 12.97],
+    2 => [17.85, 19.96, 24.60],
+    3 => [32.00, 34.91, 41.07],
+    4 => [49.65, 53.12, 60.16],
+    5 => [71.86, 76.07, 84.45],
+    6 => [97.18, 102.14, 111.01],
+    7 => [126.58, 131.70, 143.09],
+    8 => [159.48, 165.58, 177.20],
+    9 => [196.37, 202.92, 215.74],
+    10 => [236.54, 244.15, 257.68]
+)
+
+# Case 2 — Max eigenvalue test critical values
+const JOHANSEN_MAX_CV_CONSTANT = Dict(
+    1 => [7.52, 9.24, 12.97],
+    2 => [13.75, 15.67, 20.20],
+    3 => [19.77, 22.00, 26.81],
+    4 => [25.56, 28.14, 33.24],
+    5 => [31.66, 34.40, 39.79],
+    6 => [37.45, 40.30, 46.82],
+    7 => [43.25, 46.45, 51.91],
+    8 => [49.18, 52.00, 57.95],
+    9 => [54.71, 57.42, 63.71],
+    10 => [60.29, 63.57, 69.94]
+)
+
+# Case 4 (:trend) — Restricted trend in cointegrating relation, unrestricted constant
+# Trace test critical values (Osterwald-Lenum 1992, Table 2*)
+const JOHANSEN_TRACE_CV_TREND = Dict(
+    1 => [10.49, 12.53, 16.31],
+    2 => [22.76, 25.32, 30.45],
+    3 => [39.06, 42.44, 48.45],
+    4 => [59.14, 62.99, 70.05],
+    5 => [83.20, 87.31, 96.58],
+    6 => [110.42, 114.90, 124.75],
+    7 => [141.01, 146.76, 155.36],
+    8 => [175.16, 182.82, 192.89],
+    9 => [212.66, 222.21, 233.13],
+    10 => [254.46, 264.22, 277.71]
+)
+
+# Case 4 — Max eigenvalue test critical values
+const JOHANSEN_MAX_CV_TREND = Dict(
+    1 => [10.49, 12.53, 16.31],
+    2 => [16.85, 18.96, 23.65],
+    3 => [23.11, 25.54, 30.34],
+    4 => [29.12, 31.46, 36.65],
+    5 => [34.75, 37.52, 42.36],
+    6 => [40.91, 43.97, 48.94],
+    7 => [46.32, 49.51, 54.71],
+    8 => [52.16, 55.24, 61.57],
+    9 => [57.87, 60.81, 66.76],
+    10 => [63.37, 66.91, 72.64]
 )

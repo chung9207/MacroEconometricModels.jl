@@ -81,10 +81,10 @@ f_t = A_1 f_{t-1} + \cdots + A_p f_{t-p} + u_t, \quad u_t \sim N(0, Q)
 
 where ``f_t \in \mathbb{R}^r`` are the latent factors, ``\lambda_i`` are factor loadings, and ``e_{i,t}`` are idiosyncratic components.
 
-**Quarterly temporal aggregation.** Quarterly variables are linked to the monthly factors via Mariano-Murasawa weights ``[1, 2, 3, 2, 1]``, representing the flow nature of quarterly data as a weighted average of monthly latent values.
+**Quarterly temporal aggregation.** Quarterly variables are linked to the monthly factors via Mariano-Murasawa (2003) weights ``[1, 2, 3, 2, 1]``, representing the flow nature of quarterly data as a weighted average of monthly latent values. The state vector is augmented to include 5 lags of the factors, and the quarterly observation equation sets loadings ``C[i, \text{lag}_k] = w_k \cdot \lambda_i`` for ``k = 1, \ldots, 5`` where ``w = [1, 2, 3, 2, 1]``. This full lag augmentation correctly captures the three-month accumulation pattern, ensuring that quarterly observations inform factor estimation at all constituent months.
 
 **Estimation.** The EM algorithm alternates between:
-- **E-step**: Kalman smoother with NaN-aware observation equations extracts factors
+- **E-step**: Kalman smoother with NaN-aware observation equations extracts factors from the augmented state
 - **M-step**: Update state-space parameters (A, C, Q, R) from sufficient statistics
 
 ### Usage
@@ -133,7 +133,7 @@ y_t = c + B_1 y_{t-1} + \cdots + B_p y_{t-p} + u_t, \quad u_t \sim N(0, \Sigma)
 **Prior structure.** The Normal-Inverse-Wishart prior implements four types of shrinkage via dummy observations:
 
 1. **Tightness** (``\lambda``): lag-decaying overall shrinkage
-2. **Cross-variable** (``\theta``): shrinks cross-variable coefficients relative to own-lag
+2. **Cross-variable** (``\theta``): shrinks cross-variable coefficients relative to own-lag, setting off-diagonal dummy observation values to ``\sigma_i / (\theta \lambda l^2)`` so that ``\theta`` actively scales the prior on cross-variable lags
 3. **Sum-of-coefficients** (``\mu``): unit root prior (random walk for each variable)
 4. **Co-persistence** (``\alpha``): common stochastic trend prior
 

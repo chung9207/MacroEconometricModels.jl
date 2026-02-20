@@ -137,7 +137,7 @@ function _kalman_smoother_dfm(Y::AbstractMatrix{T}, Λ::AbstractMatrix{T}, A::Ve
         # Update step
         v_t = Y[t, :] - Z * a_pred[t, :]
         F_t = Symmetric(Z * P_pred[t, :, :] * Z' + H)
-        F_inv = try inv(F_t) catch; pinv(F_t) end
+        F_inv = robust_inv(F_t)
         K_t = P_pred[t, :, :] * Z' * F_inv
 
         a_filt[t, :] = a_pred[t, :] + K_t * v_t
@@ -157,7 +157,7 @@ function _kalman_smoother_dfm(Y::AbstractMatrix{T}, Λ::AbstractMatrix{T}, A::Ve
     a_smooth[T_obs, :], P_smooth[T_obs, :, :] = a_filt[T_obs, :], P_filt[T_obs, :, :]
 
     for t in (T_obs-1):-1:1
-        P_pred_inv = try inv(Symmetric(P_pred[t+1, :, :])) catch; pinv(Symmetric(P_pred[t+1, :, :])) end
+        P_pred_inv = robust_inv(P_pred[t+1, :, :])
         J_t = P_filt[t, :, :] * T_mat' * P_pred_inv
         a_smooth[t, :] = a_filt[t, :] + J_t * (a_smooth[t+1, :] - a_pred[t+1, :])
         P_smooth[t, :, :] = P_filt[t, :, :] + J_t * (P_smooth[t+1, :, :] - P_pred[t+1, :, :]) * J_t'

@@ -69,8 +69,11 @@ function johansen_test(Y::AbstractMatrix{T}, p::Int;
     T_obs < n + p + 10 && throw(ArgumentError("Not enough observations for Johansen test"))
     p < 1 && throw(ArgumentError("Number of lags p must be at least 1"))
 
-    # VECM representation: ΔYₜ = Π Yₜ₋₁ + Σᵢ Γᵢ ΔYₜ₋ᵢ + μ + εₜ
-    # where Π = αβ' is the long-run matrix
+    # VECM representation: ΔYₜ = αβ'Yₜ₋₁ + Σᵢ Γᵢ ΔYₜ₋ᵢ + det + εₜ
+    # Johansen (1991) Cases:
+    #   :none    = Case 1: no deterministic terms
+    #   :constant = Case 2: restricted constant in cointegrating relation
+    #   :trend   = Case 4: restricted trend + unrestricted constant
 
     # Construct matrices
     dY = diff(Y, dims=1)  # ΔY: (T-1) × n
@@ -87,25 +90,35 @@ function johansen_test(Y::AbstractMatrix{T}, p::Int;
     # Dependent variable
     dY_eff = dY[p:end, :]
 
-    # Deterministic terms
+    # Deterministic terms and augmented Y_lag
+    # Case 1 (:none): Z = lagged diffs only; Y_lag unaugmented
+    # Case 2 (:constant): constant restricted to cointegrating space (augment Y_lag)
+    # Case 4 (:trend): trend restricted, constant unrestricted in Z
     if deterministic == :none
         Z = dY_lags
+        Y_lag_aug = Y_lag
     elseif deterministic == :constant
-        Z = isempty(dY_lags) ? ones(T, T_eff, 1) : hcat(ones(T, T_eff), dY_lags)
+        # Case 2: restrict constant to cointegrating relation
+        # Augment Y_lag with ones so constant enters β'[Y_{t-1}; 1]
+        Z = dY_lags  # no unrestricted deterministic terms
+        Y_lag_aug = hcat(Y_lag, ones(T, T_eff))
     else  # :trend
-        trend = T.(1:T_eff)
-        Z = isempty(dY_lags) ? hcat(ones(T, T_eff), trend) : hcat(ones(T, T_eff), trend, dY_lags)
+        # Case 4: restrict trend, keep constant unrestricted
+        Z = isempty(dY_lags) ? ones(T, T_eff, 1) : hcat(ones(T, T_eff), dY_lags)
+        Y_lag_aug = hcat(Y_lag, T.(1:T_eff))
     end
 
-    # Concentrate out short-run dynamics
+    # Concentrate out short-run dynamics via least squares projection
     if size(Z, 2) > 0
-        M = I - Z * ((Z'Z) \ Z')
-        R0 = M * dY_eff   # Residuals from regressing ΔY on Z
-        R1 = M * Y_lag    # Residuals from regressing Y_{t-1} on Z
+        R0 = dY_eff - Z * (Z \ dY_eff)
+        R1 = Y_lag_aug - Z * (Z \ Y_lag_aug)
     else
         R0 = dY_eff
-        R1 = Y_lag
+        R1 = Y_lag_aug
     end
+
+    # Dimension of the augmented system (n + number of restricted deterministic terms)
+    n_aug = size(Y_lag_aug, 2)
 
     # Moment matrices
     S00 = (R0'R0) / T_eff
@@ -115,17 +128,17 @@ function johansen_test(Y::AbstractMatrix{T}, p::Int;
 
     # Solve generalized eigenvalue problem
     # |λS₁₁ - S₁₀S₀₀⁻¹S₀₁| = 0
-    S00_inv = inv(S00)
+    S00_inv = robust_inv(S00)
     A = S11 \ (S10 * S00_inv * S01)
 
-    # Eigendecomposition
+    # Eigendecomposition (n_aug × n_aug for augmented systems)
     eig = eigen(A)
     idx = sortperm(real.(eig.values), rev=true)
-    eigenvalues = real.(eig.values[idx])
-    eigenvectors = real.(eig.vectors[:, idx])
+    eigenvalues_all = real.(eig.values[idx])
+    eigenvectors_all = real.(eig.vectors[:, idx])
 
-    # Ensure eigenvalues are in [0, 1]
-    eigenvalues = clamp.(eigenvalues, 0, 1 - eps(T))
+    # Use only the first n eigenvalues for test statistics
+    eigenvalues = clamp.(eigenvalues_all[1:n], 0, 1 - eps(T))
 
     # Test statistics
     trace_stats = Vector{T}(undef, n)
@@ -138,15 +151,23 @@ function johansen_test(Y::AbstractMatrix{T}, p::Int;
         max_eigen_stats[r+1] = -T_eff * log(1 - eigenvalues[r+1])
     end
 
-    # Critical values
+    # Select critical values based on deterministic specification
+    cv_trace_tbl, cv_max_tbl = if deterministic == :none
+        JOHANSEN_TRACE_CV_NONE, JOHANSEN_MAX_CV_NONE
+    elseif deterministic == :constant
+        JOHANSEN_TRACE_CV_CONSTANT, JOHANSEN_MAX_CV_CONSTANT
+    else  # :trend
+        JOHANSEN_TRACE_CV_TREND, JOHANSEN_MAX_CV_TREND
+    end
+
     cv_trace = Matrix{T}(undef, n, 3)
     cv_max = Matrix{T}(undef, n, 3)
 
     for r in 0:(n-1)
         n_minus_r = n - r
-        if haskey(JOHANSEN_TRACE_CV_CONSTANT, n_minus_r)
-            cv_trace[r+1, :] = T.(JOHANSEN_TRACE_CV_CONSTANT[n_minus_r])
-            cv_max[r+1, :] = T.(JOHANSEN_MAX_CV_CONSTANT[n_minus_r])
+        if haskey(cv_trace_tbl, n_minus_r)
+            cv_trace[r+1, :] = T.(cv_trace_tbl[n_minus_r])
+            cv_max[r+1, :] = T.(cv_max_tbl[n_minus_r])
         else
             # Extrapolate for large systems (approximate)
             cv_trace[r+1, :] = T.([6.5 + 10*n_minus_r, 8.18 + 10*n_minus_r, 11.65 + 12*n_minus_r])
@@ -197,8 +218,11 @@ function johansen_test(Y::AbstractMatrix{T}, p::Int;
     end
 
     # Cointegrating vectors and adjustment coefficients
-    beta = eigenvectors[:, 1:max(1, rank)]  # β: cointegrating vectors
-    alpha = S01 * beta * inv(beta' * S11 * beta)  # α: adjustment coefficients
+    # For augmented systems, extract only the n variable rows from eigenvectors
+    r_eff = max(1, rank)
+    beta_aug = eigenvectors_all[:, 1:r_eff]  # full augmented eigenvectors
+    beta = beta_aug[1:n, :]  # β: cointegrating vectors (n × r)
+    alpha = S01 * beta_aug * robust_inv(beta_aug' * S11 * beta_aug)  # α: adjustment (n × r)
 
     JohansenResult(
         trace_stats, trace_pvalues,

@@ -107,8 +107,10 @@ const TEST_GROUPS = [
 function run_test_group(group_name::String, files::Vector{String})
     test_dir = replace(string(@__DIR__), '\\' => '/')  # forward slashes for Windows compat
     includes = join(["include(\"$(test_dir)/$(f)\");" for f in files], "\n    ")
+    fixtures_path = replace(joinpath(test_dir, "fixtures.jl"), '\\' => '/')
     code = """
     using Test, MacroEconometricModels
+    include("$(fixtures_path)")
     @testset "$group_name" begin
         $includes
     end

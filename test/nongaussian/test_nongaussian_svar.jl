@@ -129,6 +129,14 @@ using StatsAPI
             @test result isa NonGaussianMLResult{Float64}
             @test result.distribution == :mixture_normal
             @test norm(result.Q' * result.Q - I) < 1e-6
+
+            # Verify unit variance constraint: σ₂² > 0 (sigmoid bound)
+            p_mix = result.dist_params[:p_mix]
+            sigma1 = result.dist_params[:sigma1]
+            for j in 1:n
+                sigma2_sq = (1.0 - p_mix[j] * sigma1[j]^2) / (1.0 - p_mix[j])
+                @test sigma2_sq > 0
+            end
         end
 
         @testset "PML" begin
@@ -194,6 +202,13 @@ using StatsAPI
             @test all(result.garch_params[:, 1] .> 0)
             @test all(result.garch_params[:, 2] .>= 0)
             @test all(result.garch_params[:, 3] .>= 0)
+
+            # B₀ = L * Q relationship (Givens-based parametrization)
+            L = MacroEconometricModels.safe_cholesky(model.Sigma)
+            @test Matrix(L) * result.Q ≈ result.B0 atol=1e-10
+
+            # Q should be orthogonal
+            @test norm(result.Q' * result.Q - I) < 1e-10
 
             buf = IOBuffer()
             show(buf, result)

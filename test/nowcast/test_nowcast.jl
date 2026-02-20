@@ -312,6 +312,49 @@ end
         @test !any(isnan, m.X_sm)
     end
 
+    @testset "Mariano-Murasawa temporal aggregation (#38)" begin
+        rng = Random.MersenneTwister(3838)
+        T_obs = 120; nM = 3; nQ = 2; r = 2
+
+        Y = randn(rng, T_obs, nM + nQ)
+        for j in (nM+1):(nM+nQ)
+            for t in 1:T_obs
+                mod(t, 3) != 0 && (Y[t, j] = NaN)
+            end
+        end
+
+        m = nowcast_dfm(Y, nM, nQ; r=r, p=1, max_iter=30)
+
+        # State dimension: r*max(p,5) + nM(ar1) + 5*nQ = 2*5+3+10 = 23
+        n_f = r
+        p_eff = 5
+        @test size(m.A, 1) == n_f * p_eff + nM + 5 * nQ
+
+        # Quarterly factor loadings must have [1,2,3,2,1] structure
+        weights = [1.0, 2.0, 3.0, 2.0, 1.0]
+        for q in 1:nQ
+            i = nM + q
+            for c in 1:n_f
+                base_load = m.C[i, c]  # w=1 at lag 0
+                if abs(base_load) > 1e-10
+                    for k in 1:4
+                        @test m.C[i, k * n_f + c] ≈ weights[k + 1] * base_load
+                    end
+                end
+            end
+        end
+
+        # Monthly variables: zero loadings on lagged factor states
+        for i in 1:nM, k in 1:4, c in 1:n_f
+            @test m.C[i, k * n_f + c] == 0.0
+        end
+
+        # With nQ=0, state dim should use p not max(p,5)
+        Y_monthly = randn(rng, 80, 4)
+        m0 = nowcast_dfm(Y_monthly, 4, 0; r=2, p=1, max_iter=10)
+        @test size(m0.A, 1) == 2 * 1 + 4  # r*p + nM (ar1), no quarterly
+    end
+
     @testset "Input validation" begin
         Y = randn(50, 5)
         @test_throws ArgumentError nowcast_dfm(Y, 3, 3)  # nM + nQ != N
@@ -393,6 +436,36 @@ end
         Y = randn(50, 5)
         @test_throws ArgumentError nowcast_bvar(Y, 3, 3)  # nM + nQ != N
         @test_throws ArgumentError nowcast_bvar(Y, 5, 0; lags=0)  # lags < 1
+    end
+
+    @testset "Theta cross-variable shrinkage" begin
+        rng = Random.MersenneTwister(500)
+        N = 3
+        lags = 2
+        Y0 = randn(rng, lags, N)
+        sigma_ar = ones(N)
+        lambda = 0.2
+
+        # Theta = 1: cross-variable same as own-lag
+        Y_d1, X_d1 = MacroEconometricModels._bvar_dummy_obs(Y0, lags, sigma_ar,
+                                                              lambda, 1.0, 0.0, 0.0)
+        # Theta = 10: tighter cross-variable shrinkage
+        Y_d10, X_d10 = MacroEconometricModels._bvar_dummy_obs(Y0, lags, sigma_ar,
+                                                                lambda, 10.0, 0.0, 0.0)
+
+        # Off-diagonal X_d entries should be non-zero (fix for #36)
+        # For lag 1, variable i=1, cross-variable j=2: column 1 + (1-1)*3 + 2 = 3
+        @test X_d1[1, 3] != 0.0  # off-diagonal must be non-zero
+        @test X_d10[1, 3] != 0.0
+
+        # Higher theta => smaller off-diagonal (more shrinkage)
+        @test abs(X_d10[1, 3]) < abs(X_d1[1, 3])
+
+        # theta=1 should make off-diagonal == diagonal
+        @test X_d1[1, 2] ≈ X_d1[1, 3]  # own-lag == cross-variable when theta=1
+
+        # theta=10 off-diagonal should be 1/10 of theta=1 off-diagonal
+        @test X_d10[1, 3] ≈ X_d1[1, 3] / 10.0
     end
 
     @testset "StatsAPI interface" begin

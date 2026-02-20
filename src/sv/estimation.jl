@@ -50,11 +50,10 @@ const _KSC_VARIANCES = [
 # Core KSC Gibbs Steps
 # =============================================================================
 
-"""Draw mixture indicators s_t | h_t, y* from discrete posterior."""
-function _ksc_draw_indicators(y_star::Vector{T}, h::Vector{T}) where {T}
+"""Draw mixture indicators s_t | h_t, y* from discrete posterior (in-place)."""
+function _ksc_draw_indicators!(s::Vector{Int}, log_probs::Vector{T},
+                                y_star::Vector{T}, h::Vector{T}) where {T}
     n = length(y_star)
-    s = Vector{Int}(undef, n)
-    log_probs = Vector{T}(undef, 10)
 
     for t in 1:n
         resid = y_star[t] - h[t]
@@ -65,8 +64,14 @@ function _ksc_draw_indicators(y_star::Vector{T}, h::Vector{T}) where {T}
         end
         # Normalize in log space
         max_lp = maximum(log_probs)
-        probs = exp.(log_probs .- max_lp)
-        probs ./= sum(probs)
+        probs = log_probs  # reuse buffer for normalized probs
+        for k in 1:10
+            probs[k] = exp(log_probs[k] - max_lp)
+        end
+        s_sum = sum(probs)
+        for k in 1:10
+            probs[k] /= s_sum
+        end
 
         # Sample from categorical
         u = rand(T)
@@ -83,23 +88,28 @@ function _ksc_draw_indicators(y_star::Vector{T}, h::Vector{T}) where {T}
     s
 end
 
+"""Draw mixture indicators s_t | h_t, y* from discrete posterior."""
+function _ksc_draw_indicators(y_star::Vector{T}, h::Vector{T}) where {T}
+    n = length(y_star)
+    s = Vector{Int}(undef, n)
+    log_probs = Vector{T}(undef, 10)
+    _ksc_draw_indicators!(s, log_probs, y_star, h)
+end
+
 """
-Forward-Filtering Backward-Sampling (FFBS) for latent log-volatilities.
+Forward-Filtering Backward-Sampling (FFBS) for latent log-volatilities (in-place).
 
 Given the linear Gaussian state-space (conditional on mixture indicators):
     y*_t = h_t + ξ_t,    ξ_t ~ N(m_{s_t}, v²_{s_t})
     h_t = μ + φ(h_{t-1} - μ) + σ_η η_t
 
-Returns drawn h_{1:T}.
+Writes drawn h_{1:T} into `h_out`, using `h_filt` and `P_filt` as workspace.
 """
-function _ksc_ffbs(y_star::Vector{T}, s::Vector{Int},
-                   mu::T, phi::T, sigma_eta::T) where {T}
+function _ksc_ffbs!(h_out::Vector{T}, h_filt::Vector{T}, P_filt::Vector{T},
+                    y_star::Vector{T}, s::Vector{Int},
+                    mu::T, phi::T, sigma_eta::T) where {T}
     n = length(y_star)
     sigma2_eta = sigma_eta^2
-
-    # Forward filtering: compute filtered means and variances
-    h_filt = Vector{T}(undef, n)
-    P_filt = Vector{T}(undef, n)
 
     # Initialize from stationary distribution
     h_pred = mu
@@ -125,8 +135,7 @@ function _ksc_ffbs(y_star::Vector{T}, s::Vector{Int},
     end
 
     # Backward sampling
-    h = Vector{T}(undef, n)
-    h[n] = h_filt[n] + sqrt(max(P_filt[n], T(1e-12))) * randn(T)
+    h_out[n] = h_filt[n] + sqrt(max(P_filt[n], T(1e-12))) * randn(T)
 
     for t in (n-1):-1:1
         # Smoother gain
@@ -134,14 +143,24 @@ function _ksc_ffbs(y_star::Vector{T}, s::Vector{Int},
         P_pred_tp1 = phi^2 * P_filt[t] + sigma2_eta
         J_t = phi * P_filt[t] / P_pred_tp1
 
-        h_smooth = h_filt[t] + J_t * (h[t+1] - h_pred_tp1)
+        h_smooth = h_filt[t] + J_t * (h_out[t+1] - h_pred_tp1)
         P_smooth = P_filt[t] - J_t^2 * P_pred_tp1
         P_smooth = max(P_smooth, T(1e-12))
 
-        h[t] = h_smooth + sqrt(P_smooth) * randn(T)
+        h_out[t] = h_smooth + sqrt(P_smooth) * randn(T)
     end
 
-    h
+    h_out
+end
+
+"""FFBS allocating variant (for external callers)."""
+function _ksc_ffbs(y_star::Vector{T}, s::Vector{Int},
+                   mu::T, phi::T, sigma_eta::T) where {T}
+    n = length(y_star)
+    h_out = Vector{T}(undef, n)
+    h_filt = Vector{T}(undef, n)
+    P_filt = Vector{T}(undef, n)
+    _ksc_ffbs!(h_out, h_filt, P_filt, y_star, s, mu, phi, sigma_eta)
 end
 
 """
@@ -220,16 +239,21 @@ end
 # Student-t variant: draw scale mixture variables
 # =============================================================================
 
-"""Draw scale mixture variables λ_t | y_t, h_t, ν for Student-t SV."""
-function _ksc_draw_lambda(y::Vector{T}, h::Vector{T}, nu::T) where {T}
+"""Draw scale mixture variables λ_t | y_t, h_t, ν for Student-t SV (in-place)."""
+function _ksc_draw_lambda!(lambda::Vector{T}, y::Vector{T}, h::Vector{T}, nu::T) where {T}
     n = length(y)
-    lambda = Vector{T}(undef, n)
     for t in 1:n
         a = (nu + one(T)) / T(2)
         b = (nu + y[t]^2 * exp(-h[t])) / T(2)
         lambda[t] = rand(Gamma(a)) / b  # Gamma → 1/IG
     end
     lambda
+end
+
+"""Draw scale mixture variables λ_t | y_t, h_t, ν for Student-t SV."""
+function _ksc_draw_lambda(y::Vector{T}, h::Vector{T}, nu::T) where {T}
+    lambda = Vector{T}(undef, length(y))
+    _ksc_draw_lambda!(lambda, y, h, nu)
 end
 
 """Draw degrees of freedom ν | λ_{1:T} via MH with log-normal proposal."""
@@ -426,24 +450,33 @@ function estimate_sv(y::AbstractVector{T};
     sigma_eta_draws = Vector{T}(undef, n_samples)
     h_draws = Matrix{T}(undef, n_samples, n)
 
+    # Pre-allocate MCMC workspace buffers
+    s_buf = Vector{Int}(undef, n)
+    log_probs_buf = Vector{T}(undef, 10)
+    h_filt_buf = Vector{T}(undef, n)
+    P_filt_buf = Vector{T}(undef, n)
+    y_star_eff = Vector{T}(undef, n)
+
     draw_idx = 0
 
     for iter in 1:total_iters
         # For Student-t: modify y_star to account for scale mixture
         if dist == :studentt
-            y_star_eff = log.(y_vec.^2 ./ lambda .+ c)
+            @inbounds for t in 1:n
+                y_star_eff[t] = log(y_vec[t]^2 / lambda[t] + c)
+            end
         else
-            y_star_eff = y_star
+            copyto!(y_star_eff, y_star)
         end
 
         # Step 1: Draw mixture indicators s_t | h_t, y*
-        s = _ksc_draw_indicators(y_star_eff, h)
+        _ksc_draw_indicators!(s_buf, log_probs_buf, y_star_eff, h)
 
         # Step 2: Draw h_{1:T} via FFBS
         if leverage
-            h = _ksc_ffbs_leverage(y_star_eff, y_vec, s, mu, phi, sigma_eta, rho)
+            h = _ksc_ffbs_leverage(y_star_eff, y_vec, s_buf, mu, phi, sigma_eta, rho)
         else
-            h = _ksc_ffbs(y_star_eff, s, mu, phi, sigma_eta)
+            _ksc_ffbs!(h, h_filt_buf, P_filt_buf, y_star_eff, s_buf, mu, phi, sigma_eta)
         end
 
         # Step 3: Draw (μ, φ, σ_η)
@@ -456,7 +489,7 @@ function estimate_sv(y::AbstractVector{T};
 
         # Step 5 (Student-t): Draw λ_t and ν
         if dist == :studentt
-            lambda = _ksc_draw_lambda(y_vec, h, nu)
+            _ksc_draw_lambda!(lambda, y_vec, h, nu)
             nu = _ksc_draw_nu(lambda, nu)
         end
 

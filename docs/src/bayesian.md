@@ -263,7 +263,7 @@ Because we use the conjugate Normal-Inverse-Wishart (NIW) prior, the posterior h
 
 **`:direct` (default)**: Draws i.i.d. from the analytical NIW posterior. No burn-in or thinning is needed because each draw is independent.
 
-**`:gibbs`**: Two-block Gibbs sampler that alternates between drawing ``B | \Sigma, Y`` and ``\Sigma | B, Y``. This is useful for extensions, diagnostics, or comparing with the direct sampler. Supports `burnin` and `thinning` parameters.
+**`:gibbs`**: Two-block Gibbs sampler that alternates between drawing ``B | \Sigma, Y`` and ``\Sigma | B, Y``. This is useful for extensions, diagnostics, or comparing with the direct sampler. Supports `burnin` and `thinning` parameters. The Gibbs sampler is optimized: the posterior variance ``V_{post}`` is computed once before the sampling loop (since it depends only on data, not the current draw), and workspace buffers are pre-allocated to minimize allocations.
 
 ### BVARPosterior Type
 

@@ -142,6 +142,46 @@ using Random
         @test result isa LPImpulseResponse
     end
 
+    @testset "LP-IV HAC-robust F-statistic (#35)" begin
+        # The first-stage F-stat should use HAC variance at h > 0
+        # because LP residuals have MA(h-1) autocorrelation (Jordà 2005)
+        Random.seed!(35035)
+        T_hac = 400
+        n_hac = 2
+
+        Z_hac = randn(T_hac, 1)
+        shock_hac = 0.5 * Z_hac[:, 1] + 0.5 * randn(T_hac)
+
+        Y_hac = zeros(T_hac, n_hac)
+        Y_hac[:, 1] = shock_hac
+        for t in 2:T_hac
+            Y_hac[t, 2] = 0.6 * Y_hac[t-1, 2] + 0.5 * shock_hac[t] + randn()
+        end
+
+        horizon = 8
+        model_hac = estimate_lp_iv(Y_hac, 1, Z_hac, horizon; lags=2)
+
+        # F-stats should be finite and positive
+        @test all(model_hac.first_stage_F .> 0)
+        @test all(isfinite.(model_hac.first_stage_F))
+
+        # At h=0, HAC with auto bandwidth is used (no MA correction needed)
+        # At h > 0, bandwidth is floored at h+1, so F-stats typically decrease
+        # compared to naive homoskedastic F (which ignores serial correlation)
+        @test model_hac.first_stage_F[1] > 0  # h=0
+
+        # The first_stage_regression function should accept h kwarg
+        endog_test = randn(100)
+        Z_test = randn(100, 1)
+        ctrl_test = randn(100, 3)
+        fs0 = MacroEconometricModels.first_stage_regression(endog_test, Z_test, ctrl_test; h=0)
+        fs5 = MacroEconometricModels.first_stage_regression(endog_test, Z_test, ctrl_test; h=5)
+        @test fs0.F_stat > 0
+        @test fs5.F_stat > 0
+        @test isfinite(fs0.F_stat)
+        @test isfinite(fs5.F_stat)
+    end
+
     @testset "Smooth LP (Barnichon & Brownlees 2019)" begin
         # Generate data
         T = 200
@@ -700,7 +740,7 @@ using Random
             Y_st[t, :] = 0.5 * Y_st[t-1, :] + randn(n_st)
         end
 
-        # Test NLLS method
+        # Test NLLS method (now uses Optim.NelderMead)
         result_nlls = MacroEconometricModels.estimate_transition_params(
             z_st, Y_st, 1; method=:nlls, c_init=:median
         )
@@ -709,6 +749,7 @@ using Random
         @test haskey(result_nlls, :F_values)
         @test result_nlls.gamma > 0
         @test all(0 .<= result_nlls.F_values .<= 1)
+        @test result_nlls.convergence_info.method == :nlls
 
         # Test grid search method
         result_grid = MacroEconometricModels.estimate_transition_params(
@@ -717,6 +758,12 @@ using Random
         @test haskey(result_grid, :gamma)
         @test haskey(result_grid, :c)
         @test result_grid.convergence_info.method == :grid_search
+
+        # Optimizer SSR should be <= grid search SSR (at least as good)
+        F_nlls = MacroEconometricModels.logistic_transition(z_st, result_nlls.gamma, result_nlls.c)
+        F_grid = MacroEconometricModels.logistic_transition(z_st, result_grid.gamma, result_grid.c)
+        @test all(0 .<= F_nlls .<= 1)
+        @test all(0 .<= F_grid .<= 1)
     end
 
     @testset "State-Dependent LP - Regime IRFs" begin

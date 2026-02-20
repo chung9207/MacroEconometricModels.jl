@@ -248,9 +248,42 @@ function _compute_ZF(restrictions::SVARRestrictions, Phi::Vector{<:AbstractMatri
     isempty(rows) ? zeros(T, 0, size(L, 1)) : reduce(vcat, [r' for r in rows])
 end
 
-"""Convert orthogonal matrix Q to sphere coordinates w using setup's W matrices."""
+"""
+Compute QR sign patterns for each shock's M_j matrix.
+Returns Vector{Vector{Int}} where signs[j][col] is +1 or -1.
+Used to fix the sign convention across finite-difference perturbations.
+"""
+function _compute_qr_signs(Q::AbstractMatrix{T}, setup::_AriasSVARSetup,
+                           restrictions::SVARRestrictions,
+                           Phi::Vector{<:AbstractMatrix}, L::LowerTriangular) where {T}
+    n = size(Q, 1)
+    signs = Vector{Vector{Int}}(undef, n)
+
+    for j in 1:n
+        parts = Matrix{T}[]
+        j > 1 && push!(parts, Matrix{T}(Q[:, 1:j-1]'))
+        ZF_j = _compute_ZF(restrictions, Phi, L, j)
+        size(ZF_j, 1) > 0 && push!(parts, Matrix{T}(ZF_j))
+        push!(parts, Matrix{T}(setup.W[j]))
+
+        M_j = vcat(parts...)
+        F = qr(M_j')
+        R_diag = diag(F.R)
+        signs[j] = [R_diag[col] < zero(T) ? -1 : 1 for col in 1:length(R_diag)]
+    end
+
+    signs
+end
+
+"""Convert orthogonal matrix Q to sphere coordinates w using setup's W matrices.
+
+When `ref_signs` is provided, uses the fixed sign convention from a reference point
+instead of re-evaluating `sign(diag(R))`. This eliminates discontinuities in the
+QR sign correction that cause unreliable finite-difference Jacobians.
+"""
 function _Q_to_spheres(Q::AbstractMatrix, setup::_AriasSVARSetup, restrictions::SVARRestrictions,
-                       Phi::Vector{<:AbstractMatrix}, L::LowerTriangular)
+                       Phi::Vector{<:AbstractMatrix}, L::LowerTriangular;
+                       ref_signs::Union{Nothing, Vector{Vector{Int}}}=nothing)
     T = eltype(Q)
     n = size(Q, 1)
     w_parts = Vector{Vector{T}}()
@@ -271,8 +304,15 @@ function _Q_to_spheres(Q::AbstractMatrix, setup::_AriasSVARSetup, restrictions::
         F = qr(M_j')
         K = Matrix{T}(F.Q)
         R_diag = diag(F.R)
-        for col in 1:size(K, 2)
-            R_diag[col] < 0 && (K[:, col] = -K[:, col])
+        if ref_signs !== nothing
+            # Use reference signs to avoid discontinuity across finite differences
+            for col in 1:size(K, 2)
+                ref_signs[j][col] < 0 && (K[:, col] = -K[:, col])
+            end
+        else
+            for col in 1:size(K, 2)
+                R_diag[col] < 0 && (K[:, col] = -K[:, col])
+            end
         end
 
         # Last s_j columns form null-space basis
@@ -348,9 +388,17 @@ end
 """
 Build closure ff_h: structural_vec → (B, Σ, w) for volume element computation.
 Maps structural parameters to reduced-form parameters + sphere coordinates.
+
+Captures reference QR sign patterns on first evaluation to ensure the function
+is smooth for numerical differentiation. Without this, the QR sign correction
+`R_diag[col] < 0 → flip` creates discontinuities that make finite-difference
+Jacobians unreliable (Issue #37).
 """
 function _build_ff_h(setup::_AriasSVARSetup{T}, restrictions::SVARRestrictions,
                      n::Int, m::Int, p::Int, max_h::Int) where {T}
+    ref_signs_storage = Ref{Union{Nothing, Vector{Vector{Int}}}}(nothing)
+    first_call = Ref(true)
+
     function ff_h(x::AbstractVector)
         A0, Aplus = _unpack_structural(x, n, m)
         B_rf, Sigma_rf = _struct_to_rf(Matrix{T}(A0), Matrix{T}(Aplus))
@@ -359,7 +407,15 @@ function _build_ff_h(setup::_AriasSVARSetup{T}, restrictions::SVARRestrictions,
         Q_rf = Matrix{T}(L_rf') * A0
 
         Phi_rf = _compute_ma_from_B(Matrix{T}(B_rf), n, p, max_h)
-        w_rf = _Q_to_spheres(Q_rf, setup, restrictions, Phi_rf, L_rf)
+
+        if first_call[]
+            # Record the sign pattern at the reference point
+            ref_signs_storage[] = _compute_qr_signs(Q_rf, setup, restrictions, Phi_rf, L_rf)
+            first_call[] = false
+        end
+
+        w_rf = _Q_to_spheres(Q_rf, setup, restrictions, Phi_rf, L_rf;
+                              ref_signs=ref_signs_storage[])
 
         vcat(vec(B_rf), _vech(Sigma_rf), w_rf)
     end

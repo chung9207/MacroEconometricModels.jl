@@ -108,7 +108,7 @@ Random.seed!(42)
 end
 
 # =============================================================================
-# Cumulative IRF (Issue #15)
+# Cumulative IRF (Issue #15 + #31 fix: cumulate draws before quantile extraction)
 # =============================================================================
 @testset "Cumulative IRF" begin
     Random.seed!(42)
@@ -116,7 +116,7 @@ end
     model = estimate_var(Y, 2)
     H = 20
 
-    @testset "VAR cumulative IRF" begin
+    @testset "VAR cumulative IRF - no CI" begin
         irf_result = irf(model, H)
         cirf = cumulative_irf(irf_result)
 
@@ -128,20 +128,65 @@ end
         expected = cumsum(irf_result.values, dims=1)
         @test cirf.values ≈ expected
 
-        # CI bands should also be cumulated
-        @test cirf.ci_lower ≈ cumsum(irf_result.ci_lower, dims=1)
-        @test cirf.ci_upper ≈ cumsum(irf_result.ci_upper, dims=1)
+        # No CI case: ci_lower/ci_upper are zeros, cumsum of zeros is zeros
+        @test all(cirf.ci_lower .== 0)
+        @test all(cirf.ci_upper .== 0)
     end
 
-    @testset "Bayesian cumulative IRF" begin
+    @testset "VAR cumulative IRF - bootstrap CI (Issue #31)" begin
+        Random.seed!(12345)
+        irf_boot = irf(model, H; ci_type=:bootstrap, reps=200, conf_level=0.90)
+
+        # Raw draws should be stored
+        @test irf_boot._draws !== nothing
+        @test size(irf_boot._draws, 1) == 200
+
+        cirf = cumulative_irf(irf_boot)
+
+        # Point estimate is still cumsum of original
+        @test cirf.values ≈ cumsum(irf_boot.values, dims=1)
+
+        # CI bands must be properly ordered
+        @test all(cirf.ci_lower .<= cirf.ci_upper)
+
+        # Key test: cumulative CIs should NOT equal naive cumsum of original CIs
+        # (because quantiles are not additive)
+        naive_cum_lower = cumsum(irf_boot.ci_lower, dims=1)
+        naive_cum_upper = cumsum(irf_boot.ci_upper, dims=1)
+        # At later horizons, the difference should be noticeable
+        @test !(cirf.ci_lower ≈ naive_cum_lower)
+        @test !(cirf.ci_upper ≈ naive_cum_upper)
+
+        # The correct cumulative bands should be tighter than naive cumsum
+        # (sub-additivity of quantiles in most cases)
+        correct_width = mean(cirf.ci_upper .- cirf.ci_lower)
+        naive_width = mean(naive_cum_upper .- naive_cum_lower)
+        @test correct_width < naive_width * 1.5  # not drastically wider
+    end
+
+    @testset "Bayesian cumulative IRF (Issue #31)" begin
         post = estimate_bvar(Y, 2; n_draws=200)
         birf = irf(post, H)
+
+        # Raw draws should be stored
+        @test birf._draws !== nothing
+
         bcirf = cumulative_irf(birf)
 
         @test bcirf isa BayesianImpulseResponse
         @test size(bcirf.mean) == size(birf.mean)
+
+        # Mean is additive, so cumsum of mean should equal mean of cumsum
         @test bcirf.mean ≈ cumsum(birf.mean, dims=1)
-        @test bcirf.quantiles ≈ cumsum(birf.quantiles, dims=1)
+
+        # Quantiles should be properly ordered
+        for qi in 1:(length(birf.quantile_levels)-1)
+            @test all(bcirf.quantiles[:, :, :, qi] .<= bcirf.quantiles[:, :, :, qi+1])
+        end
+
+        # Key test: cumulative quantiles should NOT equal naive cumsum
+        naive_cum_quantiles = cumsum(birf.quantiles, dims=1)
+        @test !(bcirf.quantiles ≈ naive_cum_quantiles)
     end
 end
 

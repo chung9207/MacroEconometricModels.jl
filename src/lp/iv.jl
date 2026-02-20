@@ -24,12 +24,15 @@ using LinearAlgebra, Statistics, Distributions
 
 """
     first_stage_regression(endog::AbstractVector{T}, instruments::AbstractMatrix{T},
-                           controls::AbstractMatrix{T}) -> NamedTuple
+                           controls::AbstractMatrix{T}; h::Int=0) -> NamedTuple
 
-First-stage regression for 2SLS with F-statistic for instrument relevance.
+First-stage regression for 2SLS with HAC-robust F-statistic for instrument relevance.
+
+At LP horizon h > 0, residuals have MA(h-1) autocorrelation by construction (Jordà 2005),
+so the F-statistic uses Newey-West HAC variance with bandwidth ≥ h+1.
 """
 function first_stage_regression(endog::AbstractVector{T}, instruments::AbstractMatrix{T},
-                                 controls::AbstractMatrix{T}) where {T<:AbstractFloat}
+                                 controls::AbstractMatrix{T}; h::Int=0) where {T<:AbstractFloat}
     n = length(endog)
     n_inst = size(instruments, 2)
 
@@ -39,17 +42,22 @@ function first_stage_regression(endog::AbstractVector{T}, instruments::AbstractM
     XtX_inv = robust_inv(X' * X)
     beta = XtX_inv * (X' * endog)
     fitted = X * beta
-    residuals = endog - fitted
-    sigma2 = sum(residuals.^2) / (n - k)
+    resid = endog - fitted
 
-    # F-statistic for instruments
-    inst_coef = beta[2:(n_inst + 1)]
-    V_inst = XtX_inv[2:(n_inst + 1), 2:(n_inst + 1)]
-    F_stat = n_inst == 1 ? inst_coef[1]^2 / (sigma2 * V_inst[1, 1]) :
-                           inst_coef' * inv(V_inst) * inst_coef / (n_inst * sigma2)
+    # HAC-robust F-statistic: use Newey-West sandwich variance
+    # Bandwidth = max(auto_bw, h+1) to account for MA(h-1) autocorrelation
+    auto_bw = optimal_bandwidth_nw(resid)
+    effective_bw = h > 0 ? max(auto_bw, h + 1) : auto_bw
+    V_nw = newey_west(X, resid; bandwidth=effective_bw, XtX_inv=XtX_inv)
 
-    (fitted=fitted, residuals=residuals, F_stat=T(F_stat), coefficients=beta,
-     vcov=sigma2 * XtX_inv, sigma2=sigma2, n_instruments=n_inst)
+    # Extract instrument block of the HAC variance
+    inst_idx = 2:(n_inst + 1)
+    V_nw_inst = V_nw[inst_idx, inst_idx]
+    inst_coef = beta[inst_idx]
+    F_stat = inst_coef' * robust_inv(V_nw_inst) * inst_coef / n_inst
+
+    (fitted=fitted, residuals=resid, F_stat=T(F_stat), coefficients=beta,
+     vcov=V_nw, sigma2=sum(resid.^2) / (n - k), n_instruments=n_inst)
 end
 
 """
@@ -133,7 +141,7 @@ function estimate_lp_iv(Y::AbstractMatrix{T}, shock_var::Int, instruments::Abstr
         end
 
         # First and second stage
-        fs = first_stage_regression(endog, Z, controls)
+        fs = first_stage_regression(endog, Z, controls; h=h)
         first_stage_F[h + 1] = fs.F_stat
         first_stage_coef[h + 1] = fs.coefficients[2:(n_inst + 1)]
 

@@ -24,7 +24,8 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - '1'      # Latest stable (1.12+)
+          - '1'      # Latest stable
+          - 'lts'    # Long-term support (1.10)
         os:
           - ubuntu-latest
           - windows-latest

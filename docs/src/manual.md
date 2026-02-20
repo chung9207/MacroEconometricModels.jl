@@ -239,7 +239,7 @@ When sign restrictions alone are insufficient, one can impose **zero restriction
 1. Compute MA coefficients ``\Phi_0, \ldots, \Phi_H`` and Cholesky factor ``L``
 2. For each draw, construct ``Q`` column-by-column via QR decomposition in the null space of the zero restriction matrix
 3. Check sign restrictions on the candidate IRF ``\Theta_h = \Phi_h L Q``
-4. Correct non-uniform sampling via importance weights when zero restrictions reduce the dimension
+4. Correct non-uniform sampling via importance weights from the analytical volume element Jacobian (computed from the derivatives of the QR parameterization)
 
 ```julia
 using MacroEconometricModels
@@ -294,7 +294,7 @@ When you want a **single best rotation** rather than a distribution of draws, Mo
 **Algorithm**:
 1. Parameterize ``Q`` column-by-column using spherical coordinates in the null space of zero-restriction constraints
 2. Define penalty: ``-\sum_{s} w_s \cdot \text{sign}_s \cdot \text{IRF}_s / \sigma_s`` where ``w_s = 100`` if the sign is satisfied, ``w_s = 1`` if violated
-3. Minimize penalty via two-phase Nelder-Mead: coarse global search, then local refinement
+3. Minimize penalty via two-phase Nelder-Mead: coarse global search (multi-threaded across `n_starts` random initializations), then local refinement from the best candidates
 
 ```julia
 using MacroEconometricModels

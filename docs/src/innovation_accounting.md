@@ -74,6 +74,11 @@ where ``\Theta^{cum}_H`` accumulates the impulse responses from impact through h
 
 **Credible Intervals (Bayesian)**: For each posterior draw, compute IRFs and report posterior quantiles (e.g., 16th and 84th percentiles for 68% intervals).
 
+**Stationarity Filtering**: When `stationary_only=true`, bootstrap draws with explosive companion matrix eigenvalues (``|\lambda| \geq 1``) are rejected and redrawn (Kilian 1998). This is recommended for structural analysis to ensure economically meaningful IRFs.
+
+!!! note "Cumulative IRF Confidence Intervals"
+    For cumulative IRFs with bootstrap or Bayesian CIs, the cumulative sum is computed *per draw* before extracting quantiles. This produces correct coverage, as opposed to the naive approach of cumulating the pointwise median (which underestimates uncertainty). That is, ``\text{CI}[\sum_h \Theta_h]`` is computed from the distribution of ``\{\sum_h \Theta_h^{(b)}\}_{b=1}^B``, not from ``\sum_h \text{CI}[\Theta_h]``.
+
 ### Usage
 
 ```julia
@@ -90,6 +95,9 @@ irf_result = irf(model, 20)
 
 # With bootstrap confidence intervals
 irf_ci = irf(model, 20; ci_type=:bootstrap, reps=1000)
+
+# With stationarity filtering (reject explosive draws)
+irf_stable = irf(model, 20; ci_type=:bootstrap, reps=1000, stationary_only=true)
 
 # Sign restrictions
 sign_constraints = [1 1 0; -1 0 0; 0 0 1]

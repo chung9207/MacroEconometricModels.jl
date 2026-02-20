@@ -191,6 +191,9 @@ where
 
 A rule of thumb is ``F > 10`` for strong instruments (Stock & Yogo, 2005).
 
+!!! note "HAC-Robust F-Statistic"
+    The first-stage F-statistic uses Newey-West HAC standard errors for ``\hat{V}_{\pi}``, consistent with the HAC covariance used for the second-stage inference. This is important because LP residuals are serially correlated (at least MA(``h-1``)), so a homoskedastic F-statistic would be misleading. The HAC bandwidth follows the same automatic selection as the second stage.
+
 ### Weak Instrument Robust Inference
 
 When instruments are weak, standard 2SLS inference is unreliable. Options include:
@@ -419,8 +422,11 @@ A ``k = 7`` quarter moving average of GDP growth is common, then standardized to
 
 The model is estimated by nonlinear least squares or by treating it as a linear regression in the interaction terms. The parameters ``(\gamma, c)`` can be:
 1. Fixed based on prior research
-2. Estimated via grid search or NLS
+2. Estimated via Nelder-Mead optimization (default when `gamma=:estimate`)
 3. Selected to maximize fit
+
+!!! note "Optimization of Transition Parameters"
+    When `gamma=:estimate` and `threshold=:estimate`, the transition parameters ``(\gamma, c)`` are jointly optimized using Nelder-Mead over the nonlinear least squares objective. The threshold ``c`` is box-constrained within the data's interquartile range, and ``\gamma > 0`` is enforced. This replaces a simple grid search and provides more reliable convergence, especially with multiple response variables.
 
 ### Testing for Regime Differences
 

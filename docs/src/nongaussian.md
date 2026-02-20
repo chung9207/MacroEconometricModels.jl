@@ -110,18 +110,29 @@ println(round.(ms.regime_probs[1:5, :], digits=3))
 ```
 
 The EM algorithm iterates:
-1. **E-step**: Hamilton filter (forward) + Kim smoother (backward) → regime probabilities
-2. **M-step**: Update regime covariances and transition matrix given probabilities
+1. **E-step**: Hamilton filter (forward) + Kim (1994) joint smoother (backward) → regime probabilities
+2. **M-step**: Update regime covariances and transition matrix given smoothed joint probabilities ``\xi_{t,t-1|T}(i,j)``
 
-**Reference**: Lanne & Lütkepohl (2008)
+!!! note "Kim (1994) Joint Smoother"
+    The transition matrix update in the M-step uses the Kim (1994) joint smoother to compute ``\xi_{t,t-1|T}(i,j) = P(S_t = j, S_{t-1} = i | Y_T)``. This joint probability combines forward-filtered probabilities with backward-smoothed probabilities to properly account for cross-regime correlations. The naive product ``P(S_{t-1}=i|Y_T) \cdot P(S_t=j|Y_T)`` ignores serial dependence in regime assignments and can produce biased transition matrix estimates.
+
+**Reference**: Lanne & Lütkepohl (2008), Kim (1994)
 
 ### GARCH-Based Identification
 
-Uses GARCH(1,1) conditional heteroskedasticity in the structural shocks for identification:
+Uses GARCH(1,1) conditional heteroskedasticity in the structural shocks for identification. The time-varying conditional variances ``h_{j,t}`` enter a full time-varying log-likelihood:
 
 ```math
 h_{j,t} = \omega_j + \alpha_j \varepsilon_{j,t-1}^2 + \beta_j h_{j,t-1}
 ```
+
+The structural impact matrix ``B_0`` is estimated by maximizing:
+
+```math
+\ell(B_0) = -\frac{1}{2} \sum_{t=1}^{T} \left[ n \ln(2\pi) + \sum_{j=1}^{n} \ln h_{j,t} + \sum_{j=1}^{n} \frac{\varepsilon_{j,t}^2}{h_{j,t}} \right]
+```
+
+where ``\varepsilon_t = B_0^{-1} u_t`` and each ``h_{j,t}`` is updated using the GARCH recursion with the current ``B_0``.
 
 ```julia
 garch = identify_garch(model)
@@ -329,6 +340,8 @@ Low ``\nu`` indicates heavy tails. When ``\nu \to \infty``, the shock approaches
 #### Mixture of Normals
 
 Each shock follows a mixture of two normals: ``\varepsilon_j \sim p_j N(0, \sigma_{1j}^2) + (1-p_j) N(0, \sigma_{2j}^2)`` with the unit variance constraint ``p_j \sigma_{1j}^2 + (1-p_j) \sigma_{2j}^2 = 1``.
+
+The variance ``\sigma_{1j}`` is internally reparametrized via a sigmoid function ``\sigma_{1j}^2 = \text{sigmoid}(\theta) / p_j`` to ensure ``\sigma_{1j}^2 \in (0, 1/p_j)``, which guarantees ``\sigma_{2j}^2 > 0`` for all optimizer iterates. The second variance is derived from the unit variance constraint: ``\sigma_{2j}^2 = (1 - p_j \sigma_{1j}^2) / (1 - p_j)``.
 
 ```julia
 ml = identify_mixture_normal(model)

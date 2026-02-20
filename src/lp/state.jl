@@ -90,27 +90,34 @@ function estimate_transition_params(state_var::AbstractVector{T}, Y::AbstractMat
         end
         (gamma=best_gamma, c=best_c, F_values=logistic_transition(state_var, best_gamma, best_c),
          convergence_info=(method=:grid_search, ssr=best_ssr))
-    else  # :nlls
-        gamma_curr, c_curr = gamma_init, c0
-        for iter in 1:50
-            gamma_prev, c_prev = gamma_curr, c_curr
+    else  # :nlls — Nelder-Mead optimization over (γ, c)
+        # Bounds: γ ∈ [0.1, 100], c ∈ [q05, q95]
+        c_lo = T(quantile(state_var, 0.05))
+        c_hi = T(quantile(state_var, 0.95))
 
-            # Optimize γ
-            for gamma in T.(range(max(0.1, gamma_curr - 1), gamma_curr + 1, length=10))
-                compute_ssr(gamma, c_curr) < compute_ssr(gamma_curr, c_curr) && (gamma_curr = gamma)
-            end
+        # Transform to unconstrained space: γ = exp(γ_raw), c = c_lo + (c_hi - c_lo) * sigmoid(c_raw)
+        _sigmoid(x) = one(T) / (one(T) + exp(-x))
+        gamma_to_raw(g) = log(g)
+        c_to_raw(c) = log((c - c_lo) / (c_hi - c + eps(T)))
+        raw_to_gamma(r) = exp(r)
+        raw_to_c(r) = c_lo + (c_hi - c_lo) * _sigmoid(r)
 
-            # Optimize c
-            for c in T.(quantile(state_var, range(0.1, 0.9, length=15)))
-                compute_ssr(gamma_curr, c) < compute_ssr(gamma_curr, c_curr) && (c_curr = c)
-            end
-
-            abs(gamma_curr - gamma_prev) < 1e-4 && abs(c_curr - c_prev) < 1e-4 &&
-                return (gamma=gamma_curr, c=c_curr, F_values=logistic_transition(state_var, gamma_curr, c_curr),
-                        convergence_info=(method=:nlls, iterations=iter, converged=true))
+        function obj(x)
+            g = raw_to_gamma(x[1])
+            c = raw_to_c(x[2])
+            (g < T(0.01) || g > T(200)) && return T(Inf)
+            compute_ssr(g, c)
         end
-        (gamma=gamma_curr, c=c_curr, F_values=logistic_transition(state_var, gamma_curr, c_curr),
-         convergence_info=(method=:nlls, iterations=50, converged=false))
+
+        x0 = T[gamma_to_raw(gamma_init), c_to_raw(c0)]
+        result = Optim.optimize(obj, x0, Optim.NelderMead(),
+                                Optim.Options(f_reltol=T(1e-8), iterations=500))
+        gamma_opt = raw_to_gamma(Optim.minimizer(result)[1])
+        c_opt = raw_to_c(Optim.minimizer(result)[2])
+
+        (gamma=gamma_opt, c=c_opt, F_values=logistic_transition(state_var, gamma_opt, c_opt),
+         convergence_info=(method=:nlls, iterations=Optim.iterations(result),
+                          converged=Optim.converged(result)))
     end
 end
 

@@ -95,6 +95,7 @@ end
 IRF results with optional confidence intervals.
 
 Fields: values (H×n×n), ci_lower, ci_upper, horizon, variables, shocks, ci_type.
+Internal: _draws (raw bootstrap/simulation draws for correct cumulative IRF), _conf_level.
 """
 struct ImpulseResponse{T<:AbstractFloat} <: AbstractImpulseResponse
     values::Array{T,3}
@@ -104,7 +105,13 @@ struct ImpulseResponse{T<:AbstractFloat} <: AbstractImpulseResponse
     variables::Vector{String}
     shocks::Vector{String}
     ci_type::Symbol
+    _draws::Union{Nothing, Array{T,4}}
+    _conf_level::T
 end
+
+# Backward-compatible constructors (no draws)
+ImpulseResponse{T}(values, ci_lower, ci_upper, horizon, variables, shocks, ci_type) where {T} =
+    ImpulseResponse{T}(values, ci_lower, ci_upper, horizon, variables, shocks, ci_type, nothing, zero(T))
 
 """
     BayesianImpulseResponse{T} <: AbstractImpulseResponse
@@ -112,6 +119,7 @@ end
 Bayesian IRF with posterior quantiles.
 
 Fields: quantiles (H×n×n×q), mean (H×n×n), horizon, variables, shocks, quantile_levels.
+Internal: _draws (raw posterior draws for correct cumulative IRF).
 """
 struct BayesianImpulseResponse{T<:AbstractFloat} <: AbstractImpulseResponse
     quantiles::Array{T,4}
@@ -120,7 +128,12 @@ struct BayesianImpulseResponse{T<:AbstractFloat} <: AbstractImpulseResponse
     variables::Vector{String}
     shocks::Vector{String}
     quantile_levels::Vector{T}
+    _draws::Union{Nothing, Array{T,4}}
 end
+
+# Backward-compatible constructor (no draws)
+BayesianImpulseResponse{T}(quantiles, mean, horizon, variables, shocks, quantile_levels) where {T} =
+    BayesianImpulseResponse{T}(quantiles, mean, horizon, variables, shocks, quantile_levels, nothing)
 
 # =============================================================================
 # FEVD
