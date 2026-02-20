@@ -204,7 +204,7 @@ using Statistics
             asymmetry = abs.(width_lower .- width_upper) ./ max_width
             @test mean(asymmetry) < 0.3
         catch e
-            @warn "FastICA theoretical CI failed (expected for numerically sensitive ICA)" exception=(e, catch_backtrace())
+            @warn "FastICA theoretical CI failed (expected for numerically sensitive ICA)"
             @test_skip "FastICA theoretical CI skipped due to numerical instability"
         end
     end
