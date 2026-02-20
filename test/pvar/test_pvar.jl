@@ -414,7 +414,7 @@ end
         # Our DGP has eigenvalue < 1, so should usually be stable
         # but small-panel GMM estimation can occasionally yield unstable estimates
         stab = pvar_stability(model)
-        @test stab.max_modulus < 1.5  # loose bound — GMM on short panels is noisy
+        @test maximum(stab.moduli) < 1.5  # loose bound — GMM on short panels is noisy
     end
 
     @testset "negative horizon" begin
