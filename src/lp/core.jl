@@ -444,12 +444,12 @@ function structural_lp(Y::AbstractMatrix{T}, horizon::Int;
     ET = eltype(lp_models_raw[1].Y)
     lp_models = Vector{LPModel{ET}}(lp_models_raw)
 
-    # Step 5: Build 3D IRF array and SE array
-    irfs, se_arr = _build_structural_lp_arrays(lp_models, n, horizon, ET)
+    # Step 5: Build 3D IRF array, SE array, and analytical CIs
+    irfs, se_arr, ci_lower, ci_upper = _build_structural_lp_arrays(
+        lp_models, n, horizon, ET; conf_level=conf_level)
+    ci_sym = :analytical
 
-    # Step 6: Bootstrap CIs if requested
-    ci_lower, ci_upper = zeros(ET, horizon, n, n), zeros(ET, horizon, n, n)
-    ci_sym = :none
+    # Step 6: Bootstrap CIs if requested (overrides analytical)
     if ci_type == :bootstrap
         ci_lower, ci_upper = _structural_lp_bootstrap(Matrix{ET}(Y), horizon, n, p, method,
                                                        lags, cov_type, reps, ET(conf_level),
@@ -470,24 +470,30 @@ end
 structural_lp(Y::AbstractMatrix, horizon::Int; kwargs...) =
     structural_lp(Float64.(Y), horizon; kwargs...)
 
-"""Extract 3D IRF and SE arrays from per-shock LP models."""
+"""Extract 3D IRF, SE, and analytical CI arrays from per-shock LP models."""
 function _build_structural_lp_arrays(lp_models::Vector{LPModel{T}}, n::Int,
-                                      horizon::Int, ::Type{T}) where {T<:AbstractFloat}
+                                      horizon::Int, ::Type{T};
+                                      conf_level::Real=0.95) where {T<:AbstractFloat}
     irfs = zeros(T, horizon, n, n)
     se_arr = zeros(T, horizon, n, n)
+    ci_lower = zeros(T, horizon, n, n)
+    ci_upper = zeros(T, horizon, n, n)
 
     for shock in 1:n
         irf_data = extract_shock_irf(lp_models[shock].B, lp_models[shock].vcov,
-                                      lp_models[shock].response_vars, 2)
+                                      lp_models[shock].response_vars, 2;
+                                      conf_level=conf_level)
         # extract_shock_irf returns (H+1) rows (h=0,...,H); IRF array uses h=1,...,H
         for h in 1:horizon
             for resp in 1:n
                 irfs[h, resp, shock] = irf_data.values[h+1, resp]
                 se_arr[h, resp, shock] = irf_data.se[h+1, resp]
+                ci_lower[h, resp, shock] = irf_data.ci_lower[h+1, resp]
+                ci_upper[h, resp, shock] = irf_data.ci_upper[h+1, resp]
             end
         end
     end
-    irfs, se_arr
+    irfs, se_arr, ci_lower, ci_upper
 end
 
 """Block bootstrap for structural LP confidence intervals."""

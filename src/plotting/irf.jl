@@ -59,7 +59,9 @@ function plot_result(r::ImpulseResponse{T};
             data_json = _irf_data_json(vals, ci_lo, ci_hi, H)
 
             s_json = _series_json(["IRF"], [_PLOT_COLORS[1]]; keys=["irf"])
-            bands = "[{\"lo_key\":\"ci_lo\",\"hi_key\":\"ci_hi\",\"color\":\"$(_PLOT_COLORS[1])\",\"alpha\":$(_PLOT_CI_ALPHA)}]"
+            has_ci = r.ci_type != :none
+            bands = has_ci ?
+                "[{\"lo_key\":\"ci_lo\",\"hi_key\":\"ci_hi\",\"color\":\"$(_PLOT_COLORS[1])\",\"alpha\":$(_PLOT_CI_ALPHA)}]" : "[]"
             refs = "[{\"value\":0,\"color\":\"#999\",\"dash\":\"4,3\"}]"
 
             js = _render_line_js(id, data_json, s_json;

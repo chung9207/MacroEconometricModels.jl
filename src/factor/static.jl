@@ -246,12 +246,12 @@ scree_plot_data(m::FactorModel) = (factors=1:length(m.eigenvalues), explained_va
 # =============================================================================
 
 """
-    forecast(model::FactorModel, h; p=1, ci_method=:none, conf_level=0.95, n_boot=1000)
+    forecast(model::FactorModel, h; p=1, ci_method=:theoretical, conf_level=0.95, n_boot=1000)
 
 Forecast factors and observables h steps ahead from a static factor model.
 
 Internally fits a VAR(p) on the extracted factors, then uses the VAR dynamics
-to produce multi-step forecasts and (optionally) confidence intervals.
+to produce multi-step forecasts and confidence intervals.
 
 # Arguments
 - `model`: Estimated static factor model
@@ -259,14 +259,14 @@ to produce multi-step forecasts and (optionally) confidence intervals.
 
 # Keyword Arguments
 - `p::Int=1`: VAR lag order for factor dynamics
-- `ci_method::Symbol=:none`: CI method — `:none`, `:theoretical`, or `:bootstrap`
+- `ci_method::Symbol=:theoretical`: CI method — `:none`, `:theoretical`, or `:bootstrap`
 - `conf_level::Real=0.95`: Confidence level for intervals
 - `n_boot::Int=1000`: Number of bootstrap replications (if `ci_method=:bootstrap`)
 
 # Returns
 `FactorForecast` with factor and observable forecasts (and CIs if requested).
 """
-function forecast(m::FactorModel{T}, h::Int; p::Int=1, ci_method::Symbol=:none,
+function forecast(m::FactorModel{T}, h::Int; p::Int=1, ci_method::Symbol=:theoretical,
     conf_level::Real=0.95, n_boot::Int=1000) where {T}
 
     h < 1 && throw(ArgumentError("h must be ≥ 1"))

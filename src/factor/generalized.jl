@@ -353,7 +353,7 @@ end
 # =============================================================================
 
 """
-    forecast(model::GeneralizedDynamicFactorModel, h; method=:ar, ci_method=:none, conf_level=0.95, n_boot=1000)
+    forecast(model::GeneralizedDynamicFactorModel, h; method=:ar, ci_method=:theoretical, conf_level=0.95, n_boot=1000)
 
 Forecast h steps ahead using AR extrapolation of factors.
 
@@ -363,7 +363,7 @@ Forecast h steps ahead using AR extrapolation of factors.
 
 # Keyword Arguments
 - `method::Symbol=:ar`: Forecasting method (currently only `:ar` supported)
-- `ci_method::Symbol=:none`: CI method — `:none`, `:theoretical`, or `:bootstrap`
+- `ci_method::Symbol=:theoretical`: CI method — `:none`, `:theoretical`, or `:bootstrap`
 - `conf_level::Real=0.95`: Confidence level for intervals
 - `n_boot::Int=1000`: Bootstrap replications (for `:bootstrap`)
 
@@ -371,7 +371,7 @@ Forecast h steps ahead using AR extrapolation of factors.
 `FactorForecast` with factor and observable forecasts (and CIs if requested).
 """
 function forecast(model::GeneralizedDynamicFactorModel{T}, h::Int; method::Symbol=:ar,
-    ci_method::Symbol=:none, conf_level::Real=0.95, n_boot::Int=1000) where {T}
+    ci_method::Symbol=:theoretical, conf_level::Real=0.95, n_boot::Int=1000) where {T}
 
     h < 1 && throw(ArgumentError("h must be positive"))
     method ∉ (:ar, :spectral) && throw(ArgumentError("method must be :ar or :spectral"))

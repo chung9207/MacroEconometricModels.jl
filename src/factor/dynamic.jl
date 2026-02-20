@@ -350,7 +350,7 @@ StatsAPI.bic(m::DynamicFactorModel) = -2m.loglik + dof(m) * log(nobs(m))
 # =============================================================================
 
 """
-    forecast(model::DynamicFactorModel, h; ci_method=:none, conf_level=0.95, n_boot=1000, ci=false, ci_level=0.95)
+    forecast(model::DynamicFactorModel, h; ci_method=:theoretical, conf_level=0.95, n_boot=1000, ci=false, ci_level=0.95)
 
 Forecast factors and observables h steps ahead.
 
@@ -359,7 +359,7 @@ Forecast factors and observables h steps ahead.
 - `h`: Forecast horizon
 
 # Keyword Arguments
-- `ci_method::Symbol=:none`: CI method — `:none`, `:theoretical`, `:bootstrap`, or `:simulation`
+- `ci_method::Symbol=:theoretical`: CI method — `:none`, `:theoretical`, `:bootstrap`, or `:simulation`
 - `conf_level::Real=0.95`: Confidence level for intervals
 - `n_boot::Int=1000`: Bootstrap replications (for `:bootstrap` and `:simulation`)
 - `ci::Bool=false`: Legacy keyword — `ci=true` maps to `ci_method=:simulation`
@@ -375,7 +375,7 @@ fc.observables       # h×N matrix of forecasts
 fc.observables_lower # h×N lower CI bounds
 ```
 """
-function forecast(m::DynamicFactorModel{T}, h::Int; ci_method::Symbol=:none,
+function forecast(m::DynamicFactorModel{T}, h::Int; ci_method::Symbol=:theoretical,
     conf_level::Real=0.95, n_boot::Int=1000,
     ci::Bool=false) where {T}
 

@@ -29,7 +29,7 @@ end
 
     @test fc isa FactorForecast{Float64}
     @test fc.horizon == 5
-    @test fc.ci_method == :none
+    @test fc.ci_method == :theoretical
 
     # Display
     buf = IOBuffer()
@@ -79,15 +79,24 @@ end
     end
 end
 
-@testset "FactorModel Forecast - No CI Zeros" begin
+@testset "FactorModel Forecast - Theoretical CI by Default" begin
     Random.seed!(77704)
     X = randn(100, 10)
     fm = estimate_factors(X, 2)
     fc = forecast(fm, 5)
 
-    @test all(fc.factors_lower .== 0)
-    @test all(fc.factors_upper .== 0)
-    @test all(fc.factors_se .== 0)
+    # Default is :theoretical — CIs should be non-zero
+    @test fc.ci_method == :theoretical
+    @test all(isfinite, fc.factors_lower)
+    @test all(isfinite, fc.factors_upper)
+    @test all(fc.factors_se .>= 0)
+    @test fc.factors_lower != fc.factors_upper  # CIs not degenerate
+
+    # Explicit :none should give zeros
+    fc_none = forecast(fm, 5; ci_method=:none)
+    @test all(fc_none.factors_lower .== 0)
+    @test all(fc_none.factors_upper .== 0)
+    @test all(fc_none.factors_se .== 0)
 end
 
 @testset "FactorModel Forecast - VAR Lag" begin
@@ -155,12 +164,18 @@ end
     X = randn(T_obs, N)
     dfm = estimate_dynamic_factors(X, r, p)
 
-    fc = forecast(dfm, 5; ci=true, conf_level=0.90)
+    # ci=true with explicit ci_method=:none should map to :simulation
+    fc = forecast(dfm, 5; ci=true, ci_method=:none, conf_level=0.90)
     @test fc isa FactorForecast{Float64}
     @test fc.ci_method == :simulation
     @test fc.conf_level ≈ 0.90
     @test size(fc.factors_lower) == (5, r)
     @test all(fc.factors_upper .>= fc.factors_lower)
+
+    # ci=true without explicit ci_method=:none uses default (:theoretical)
+    fc2 = forecast(dfm, 5; ci=true, conf_level=0.90)
+    @test fc2.ci_method == :theoretical
+    @test fc2.conf_level ≈ 0.90
 end
 
 @testset "DFM Forecast - Theoretical SE Non-Decreasing" begin

@@ -136,7 +136,9 @@ function plot_result(fc::VECMForecast{T};
                                          fc.ci_upper[:, vi])
 
         s_json = _series_json(["Forecast"], [_PLOT_COLORS[1]]; keys=["fc"])
-        bands = "[{\"lo_key\":\"ci_lo\",\"hi_key\":\"ci_hi\",\"color\":\"$(_PLOT_COLORS[1])\",\"alpha\":$(_PLOT_CI_ALPHA)}]"
+        has_ci = fc.ci_method != :none
+        bands = has_ci ?
+            "[{\"lo_key\":\"ci_lo\",\"hi_key\":\"ci_hi\",\"color\":\"$(_PLOT_COLORS[1])\",\"alpha\":$(_PLOT_CI_ALPHA)}]" : "[]"
 
         js = _render_line_js(id, data_json, s_json;
                              bands_json=bands, xlabel="Horizon", ylabel="Level")
@@ -144,7 +146,8 @@ function plot_result(fc::VECMForecast{T};
     end
 
     if isempty(title)
-        title = "VECM Forecast ($(fc.ci_method))"
+        title = fc.ci_method == :none ? "VECM Forecast" :
+                "VECM Forecast ($(fc.ci_method) CI)"
     end
 
     p = _make_plot(panels; title=title, ncols=ncols)
@@ -157,51 +160,70 @@ end
 # =============================================================================
 
 """
-    plot_result(fc::FactorForecast; type=:factor, var=nothing, ncols=0, title="", save_path=nothing)
+    plot_result(fc::FactorForecast; type=:both, var=nothing, ncols=0, title="",
+                n_obs=6, save_path=nothing)
 
 Plot factor model forecast.
 
-- `type=:factor`: plot factor forecasts
-- `type=:observable`: plot observable forecasts
+- `type=:both`: plot factor forecasts and top observable forecasts (default)
+- `type=:factor`: plot factor forecasts only
+- `type=:observable`: plot observable forecasts only
+- `n_obs`: max number of observables to show when `type=:both` (default 6)
 """
 function plot_result(fc::FactorForecast{T};
-                     type::Symbol=:factor, var::Union{Int,Nothing}=nothing,
+                     type::Symbol=:both, var::Union{Int,Nothing}=nothing,
                      ncols::Int=0, title::String="",
+                     n_obs::Int=6,
                      save_path::Union{String,Nothing}=nothing) where {T}
-    if type == :factor
-        data = fc.factors
-        lo = fc.factors_lower
-        hi = fc.factors_upper
-        label = "Factor"
-    else
-        data = fc.observables
-        lo = fc.observables_lower
-        hi = fc.observables_upper
-        label = "Observable"
-    end
-
-    h, n_cols = size(data)
-    vars_to_plot = var === nothing ? (1:min(n_cols, 6)) : [var]
+    has_ci = fc.ci_method != :none
+    bands_str(color) = has_ci ?
+        "[{\"lo_key\":\"ci_lo\",\"hi_key\":\"ci_hi\",\"color\":\"$(color)\",\"alpha\":$(_PLOT_CI_ALPHA)}]" : "[]"
 
     panels = _PanelSpec[]
-    for vi in vars_to_plot
-        id = _next_plot_id("fac_fc")
-        ptitle = "$label $vi"
 
-        data_json = _forecast_data_json(data[:, vi], lo[:, vi], hi[:, vi])
+    # Factor panels
+    if type == :factor || type == :both
+        h_f, n_factors = size(fc.factors)
+        fvars = var !== nothing && type == :factor ? [var] : (1:n_factors)
+        for vi in fvars
+            id = _next_plot_id("fac_fc")
+            ptitle = "Factor $vi"
+            data_json = _forecast_data_json(fc.factors[:, vi], fc.factors_lower[:, vi],
+                                             fc.factors_upper[:, vi])
+            s_json = _series_json(["Forecast"], [_PLOT_COLORS[1]]; keys=["fc"])
+            js = _render_line_js(id, data_json, s_json;
+                                 bands_json=bands_str(_PLOT_COLORS[1]),
+                                 xlabel="Horizon", ylabel="Factor")
+            push!(panels, _PanelSpec(id, ptitle, js))
+        end
+    end
 
-        s_json = _series_json(["Forecast"], [_PLOT_COLORS[1]]; keys=["fc"])
-        has_ci = fc.ci_method != :none
-        bands = has_ci ?
-            "[{\"lo_key\":\"ci_lo\",\"hi_key\":\"ci_hi\",\"color\":\"$(_PLOT_COLORS[1])\",\"alpha\":$(_PLOT_CI_ALPHA)}]" : "[]"
-
-        js = _render_line_js(id, data_json, s_json;
-                             bands_json=bands, xlabel="Horizon", ylabel=label)
-        push!(panels, _PanelSpec(id, ptitle, js))
+    # Observable panels
+    if type == :observable || type == :both
+        h_o, n_obs_total = size(fc.observables)
+        if var !== nothing && type == :observable
+            ovars = [var]
+        elseif type == :both
+            ovars = 1:min(n_obs_total, n_obs)
+        else
+            ovars = 1:min(n_obs_total, 6)
+        end
+        for vi in ovars
+            id = _next_plot_id("obs_fc")
+            ptitle = "Observable $vi"
+            data_json = _forecast_data_json(fc.observables[:, vi], fc.observables_lower[:, vi],
+                                             fc.observables_upper[:, vi])
+            s_json = _series_json(["Forecast"], [_PLOT_COLORS[2]]; keys=["fc"])
+            js = _render_line_js(id, data_json, s_json;
+                                 bands_json=bands_str(_PLOT_COLORS[2]),
+                                 xlabel="Horizon", ylabel="Observable")
+            push!(panels, _PanelSpec(id, ptitle, js))
+        end
     end
 
     if isempty(title)
-        title = "Factor Model Forecast ($(fc.ci_method))"
+        ci_part = fc.ci_method == :none ? "" : " ($(fc.ci_method) CI)"
+        title = "Factor Model Forecast$ci_part"
     end
 
     p = _make_plot(panels; title=title, ncols=ncols)

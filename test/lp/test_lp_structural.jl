@@ -57,8 +57,10 @@ using Statistics
         # Q should be identity for Cholesky
         @test slp.Q ≈ Matrix{Float64}(I, n, n)
 
-        # CI type should be :none by default
-        @test slp.irf.ci_type == :none
+        # CI type should be :analytical by default (Newey-West SEs)
+        @test slp.irf.ci_type == :analytical
+        @test all(isfinite, slp.irf.ci_lower)
+        @test all(isfinite, slp.irf.ci_upper)
     end
 
     # =========================================================================
@@ -243,17 +245,19 @@ using Statistics
         pe = point_estimate(slp)
         @test pe === slp.irf.values
 
-        @test has_uncertainty(slp) == false
-
-        @test isnothing(uncertainty_bounds(slp))
+        # Default is analytical CIs from Newey-West SEs
+        @test has_uncertainty(slp) == true
+        bounds = uncertainty_bounds(slp)
+        @test bounds isa Tuple
+        @test length(bounds) == 2
 
         # With bootstrap
         slp_ci = structural_lp(Y, 8; method=:cholesky, lags=4,
                                ci_type=:bootstrap, reps=30)
         @test has_uncertainty(slp_ci) == true
-        bounds = uncertainty_bounds(slp_ci)
-        @test bounds isa Tuple
-        @test length(bounds) == 2
+        bounds_boot = uncertainty_bounds(slp_ci)
+        @test bounds_boot isa Tuple
+        @test length(bounds_boot) == 2
     end
 
     # =========================================================================
