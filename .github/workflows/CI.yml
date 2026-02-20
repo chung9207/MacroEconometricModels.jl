@@ -24,7 +24,6 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - '1'      # Latest stable
           - 'lts'    # Long-term support (1.10)
         os:
           - ubuntu-latest
@@ -32,7 +31,7 @@ jobs:
         arch:
           - x64
         include:
-          - version: '1'
+          - version: 'lts'
             os: macos-latest
             arch: arm64
 
