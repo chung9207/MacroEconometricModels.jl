@@ -181,13 +181,11 @@ end
         end
     end
 
-    @testset "report() does not error in any backend" begin
-        _with_each_backend() do be
-            # report(VARModel) prints to stdout — just verify no errors
-            @test (redirect_stdout(devnull) do
-                report(m)
-            end; true)
-        end
+    @testset "report() does not error" begin
+        # report(VARModel) writes to stdout; backend switching already tested via show(buf, m)
+        @test (redirect_stdout(devnull) do
+            report(m)
+        end; true)
     end
 
     @testset "ARIMA show in all backends" begin

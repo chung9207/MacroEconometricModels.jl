@@ -530,17 +530,11 @@ end
     end
 
     @testset "report" begin
+        # Test show(io, m) directly — report() delegates to show(stdout, m) for VECM
+        # but redirect_stdout(devnull) has issues with some backends
         buf = IOBuffer()
-        old_stdout = stdout
-        rd, wr = redirect_stdout()
-        try
-            report(m)
-        finally
-            redirect_stdout(old_stdout)
-            close(wr)
-        end
-        output = String(read(rd))
-        close(rd)
+        show(buf, m)
+        output = String(take!(buf))
         @test occursin("VECM", output)
         @test occursin("Cointegrating", output)
     end

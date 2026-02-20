@@ -212,7 +212,8 @@ Bayesian prior optimization, instrument strength tests, and Panel VAR specificat
 
 | Function | Description |
 |----------|-------------|
-| `optimize_hyperparameters(Y, p; ...)` | Optimize Minnesota prior |
+| `optimize_hyperparameters(Y, p; ...)` | Optimize Minnesota prior (τ only) |
+| `optimize_hyperparameters_full(Y, p; ...)` | Joint optimization over (τ, λ, μ) (BGR 2010) |
 | `posterior_mean_model(post; ...)` | VARModel from posterior mean |
 | `posterior_median_model(post; ...)` | VARModel from posterior median |
 | `weak_instrument_test(model; ...)` | Test for weak instruments |

@@ -411,10 +411,11 @@ end
     end
 
     @testset "stability from DGP" begin
-        # Our DGP has eigenvalue < 1, so should usually be stable
-        # but small-panel GMM estimation can occasionally yield unstable estimates
-        stab = pvar_stability(model)
-        @test maximum(stab.moduli) < 1.5  # loose bound — GMM on short panels is noisy
+        # Use a larger panel so GMM estimates are close to the true (stationary) DGP
+        dgp_large = _make_panel_dgp(N=100, T_total=50, m=3, p=1, rng=MersenneTwister(999))
+        model_large = estimate_pvar(dgp_large.pd, 1; steps=:onestep)
+        stab = pvar_stability(model_large)
+        @test maximum(stab.moduli) < 1.0
     end
 
     @testset "negative horizon" begin

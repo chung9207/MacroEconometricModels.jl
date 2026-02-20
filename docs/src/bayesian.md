@@ -253,6 +253,53 @@ best_hyper = optimize_hyperparameters(Y, p;
 )
 ```
 
+### Full Hyperparameter Optimization (BGR 2010)
+
+The `optimize_hyperparameters` function above only searches over ``\tau`` (overall tightness), holding other hyperparameters at their defaults. Bańbura, Giannone & Reichlin (2010) recommend jointly optimizing ``(\tau, \lambda, \mu)`` to maximize the marginal likelihood, especially for large systems where the interaction between overall tightness and cross-variable shrinkage matters:
+
+```math
+(\hat{\tau}, \hat{\lambda}, \hat{\mu}) = \arg\max_{\tau, \lambda, \mu} \log p(Y | \tau, \lambda, \mu)
+```
+
+The function `optimize_hyperparameters_full` performs a three-dimensional grid search over all three hyperparameters:
+
+```julia
+using MacroEconometricModels
+
+# Load FRED-MD monetary policy variables
+fred = load_example(:fred_md)
+Y = to_matrix(apply_tcode(fred[:, ["INDPRO", "CPIAUCSL", "FEDFUNDS"]]))
+Y = Y[all.(isfinite, eachrow(Y)), :]
+p = 2
+
+# Joint optimization over (tau, lambda, mu)
+best_hyper, best_ml = optimize_hyperparameters_full(Y, p)
+
+println("Optimal hyperparameters:")
+println("  τ (overall tightness): ", round(best_hyper.tau, digits=4))
+println("  λ (own-lag scaling):   ", round(best_hyper.lambda, digits=4))
+println("  μ (cross-lag scaling): ", round(best_hyper.mu, digits=4))
+println("  Log marginal likelihood: ", round(best_ml, digits=2))
+
+# Use in estimation
+post = estimate_bvar(Y, p; n_draws=1000, prior=:minnesota, hyper=best_hyper,
+                     varnames=["INDPRO", "CPI", "FFR"])
+```
+
+Custom grid ranges can be specified for finer control:
+
+```julia
+best_hyper, best_ml = optimize_hyperparameters_full(Y, p;
+    tau_grid    = range(0.01, 2.0, length=20),   # Finer τ grid
+    lambda_grid = [0.5, 1.0, 2.0, 5.0],          # Own-lag scaling
+    mu_grid     = [0.5, 1.0, 2.0, 5.0]           # Cross-lag scaling
+)
+```
+
+Joint optimization is particularly important for large systems (``n \geq 10``), where the optimal ``\mu`` is often substantially below 1.0 — imposing strong cross-variable shrinkage while allowing own lags to remain relatively free. For small systems (``n \leq 5``), the simpler `optimize_hyperparameters` (tau-only) is usually sufficient.
+
+**Reference**: Bańbura, Giannone & Reichlin (2010)
+
 ---
 
 ## Conjugate Posterior Sampling
