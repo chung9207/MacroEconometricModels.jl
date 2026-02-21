@@ -131,6 +131,7 @@ Forecast result from a VECM, preserving cointegrating relationships.
 - `ci_lower`, `ci_upper`: Confidence interval bounds in levels (h × n)
 - `horizon`: Forecast horizon
 - `ci_method`: CI method used (`:none`, `:bootstrap`, `:simulation`)
+- `conf_level`: Confidence level for CIs (e.g., 0.95)
 """
 struct VECMForecast{T<:AbstractFloat} <: AbstractForecastResult{T}
     levels::Matrix{T}
@@ -139,6 +140,7 @@ struct VECMForecast{T<:AbstractFloat} <: AbstractForecastResult{T}
     ci_upper::Matrix{T}
     horizon::Int
     ci_method::Symbol
+    conf_level::T
     varnames::Vector{String}
 end
 

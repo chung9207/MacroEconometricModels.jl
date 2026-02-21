@@ -359,6 +359,12 @@ end
         fc = forecast(m1, 5)
         @test all(isfinite, fc.levels)
     end
+
+    @testset "VECMForecast has conf_level" begin
+        fc = forecast(m, 10; conf_level=0.90)
+        @test hasproperty(fc, :conf_level)
+        @test fc.conf_level ≈ 0.90
+    end
 end
 
 # =============================================================================

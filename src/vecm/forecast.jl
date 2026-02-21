@@ -77,7 +77,7 @@ function forecast(vecm::VECMModel{T}, h::Int;
         end
     end
 
-    VECMForecast{T}(levels, differences, ci_lower, ci_upper, h, ci_method, vecm.varnames)
+    VECMForecast{T}(levels, differences, ci_lower, ci_upper, h, ci_method, T(conf_level), vecm.varnames)
 end
 
 # =============================================================================
