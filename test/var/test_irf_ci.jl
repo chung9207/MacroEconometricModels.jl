@@ -245,7 +245,7 @@ using Statistics
     @testset "Theoretical CI symmetry - $method" for method in [:cholesky, :long_run]
         Random.seed!(12358 + hash(method))
 
-        ir = irf(model, H; method=method, ci_type=:theoretical, reps=(FAST ? 200 : 500), conf_level=0.90)
+        ir = irf(model, H; method=method, ci_type=:theoretical, reps=(FAST ? 300 : 500), conf_level=0.90)
         @test ir isa ImpulseResponse
 
         # Symmetry check

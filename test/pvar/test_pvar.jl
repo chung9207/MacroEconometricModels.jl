@@ -486,7 +486,7 @@ end
         @test size(result.irf) == (6, 2, 2)
         @test size(result.lower) == (6, 2, 2)
         @test size(result.upper) == (6, 2, 2)
-        @test size(result.draws) == (20, 6, 2, 2)
+        @test size(result.draws) == ((FAST ? 10 : 20), 6, 2, 2)
     end
 
     @testset "bootstrap CI ordering" begin
