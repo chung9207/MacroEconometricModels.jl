@@ -17,6 +17,7 @@
 # along with MacroEconometricModels.jl. If not, see <https://www.gnu.org/licenses/>.
 
 using Test
+using FFTW  # activate FFTW extension for GDFM tests
 
 # FAST mode for development iteration (shared across all test files in threaded mode)
 const FAST = get(ENV, "MACRO_FAST_TESTS", "") == "1"
@@ -110,7 +111,7 @@ function run_test_group(group_name::String, files::Vector{String})
     includes = join(["include(\"$(test_dir)/$(f)\");" for f in files], "\n    ")
     fixtures_path = replace(joinpath(test_dir, "fixtures.jl"), '\\' => '/')
     code = """
-    using Test, MacroEconometricModels
+    using Test, MacroEconometricModels, FFTW
     include("$(fixtures_path)")
     @testset "$group_name" begin
         $includes
