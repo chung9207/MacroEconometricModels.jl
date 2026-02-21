@@ -227,3 +227,74 @@ end
     @test length(results) == 10
     @test n_samples == 10
 end
+
+# =============================================================================
+# Forecast Accessor Functions
+# =============================================================================
+
+@testset "Forecast accessor functions" begin
+    Random.seed!(7050)
+    Y = randn(100, 3)
+
+    @testset "VARForecast" begin
+        m = estimate_var(Y, 2)
+        fc = forecast(m, 5)
+        @test point_forecast(fc) === fc.forecast
+        @test lower_bound(fc) === fc.ci_lower
+        @test upper_bound(fc) === fc.ci_upper
+        @test forecast_horizon(fc) == fc.horizon == 5
+    end
+
+    @testset "BVARForecast" begin
+        post = estimate_bvar(Y, 1; n_draws=50)
+        fc = forecast(post, 5)
+        @test point_forecast(fc) === fc.forecast
+        @test lower_bound(fc) === fc.ci_lower
+        @test upper_bound(fc) === fc.ci_upper
+        @test forecast_horizon(fc) == 5
+    end
+
+    @testset "ARIMAForecast" begin
+        y = cumsum(randn(100))
+        am = estimate_ar(y, 2)
+        afc = forecast(am, 5)
+        @test point_forecast(afc) === afc.forecast
+        @test lower_bound(afc) === afc.ci_lower
+        @test upper_bound(afc) === afc.ci_upper
+        @test forecast_horizon(afc) == 5
+    end
+
+    @testset "VECMForecast" begin
+        # Cointegrated system: y2 = y1 + noise
+        n = 150
+        y1 = cumsum(randn(n))
+        y2 = y1 + 0.1 * randn(n)
+        Y_ci = hcat(y1, y2)
+        vecm = estimate_vecm(Y_ci, 2; rank=1)
+        fc = forecast(vecm, 5)
+        @test point_forecast(fc) === fc.levels   # VECMForecast override
+        @test lower_bound(fc) === fc.ci_lower
+        @test upper_bound(fc) === fc.ci_upper
+        @test forecast_horizon(fc) == 5
+    end
+
+    @testset "FactorForecast" begin
+        X = randn(80, 10)
+        fm = estimate_factors(X, 2)
+        fc = forecast(fm, 3)
+        @test point_forecast(fc) === fc.observables         # FactorForecast override
+        @test lower_bound(fc) === fc.observables_lower      # FactorForecast override
+        @test upper_bound(fc) === fc.observables_upper      # FactorForecast override
+        @test forecast_horizon(fc) == 3
+    end
+
+    @testset "VolatilityForecast" begin
+        y_vol = cumsum(randn(200))
+        gm = estimate_garch(y_vol, 1, 1)
+        fc = forecast(gm, 5)
+        @test point_forecast(fc) === fc.forecast
+        @test lower_bound(fc) === fc.ci_lower
+        @test upper_bound(fc) === fc.ci_upper
+        @test forecast_horizon(fc) == 5
+    end
+end

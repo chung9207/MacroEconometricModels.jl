@@ -52,6 +52,11 @@ struct FactorForecast{T<:AbstractFloat} <: AbstractForecastResult{T}
     ci_method::Symbol             # :none, :theoretical, :bootstrap, :simulation
 end
 
+# FactorForecast stores observables (not `.forecast`) and non-standard CI field names
+point_forecast(f::FactorForecast) = f.observables
+lower_bound(f::FactorForecast) = f.observables_lower
+upper_bound(f::FactorForecast) = f.observables_upper
+
 function Base.show(io::IO, fc::FactorForecast{T}) where {T}
     h, r = size(fc.factors)
     N = size(fc.observables, 2)

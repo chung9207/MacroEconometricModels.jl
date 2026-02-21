@@ -262,6 +262,7 @@ include("plotting/nowcast.jl")
 export AbstractAnalysisResult, AbstractFrequentistResult, AbstractBayesianResult
 export AbstractVARModel, AbstractImpulseResponse, AbstractFEVD, AbstractPrior
 export AbstractForecastResult
+export point_forecast, lower_bound, upper_bound, forecast_horizon
 
 # VAR types
 export VARModel, VARForecast

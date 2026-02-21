@@ -144,6 +144,9 @@ struct VECMForecast{T<:AbstractFloat} <: AbstractForecastResult{T}
     varnames::Vector{String}
 end
 
+# VECMForecast stores its point forecast in `.levels`, not `.forecast`
+point_forecast(f::VECMForecast) = f.levels
+
 function Base.show(io::IO, f::VECMForecast{T}) where {T}
     h, n = size(f.levels)
     horizons = _select_horizons(h)

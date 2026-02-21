@@ -104,6 +104,48 @@ All subtypes have at least a `horizon::Int` field.
 abstract type AbstractForecastResult{T<:AbstractFloat} end
 
 # =============================================================================
+# Forecast Accessor Functions
+# =============================================================================
+
+"""
+    point_forecast(f::AbstractForecastResult)
+
+Return the point forecast values (Vector or Matrix).
+
+Most subtypes store the point forecast in a `.forecast` field; this default
+accessor returns that field.  Overrides exist for `VECMForecast` (`.levels`)
+and `FactorForecast` (`.observables`).
+"""
+point_forecast(f::AbstractForecastResult) = f.forecast
+
+"""
+    lower_bound(f::AbstractForecastResult)
+
+Return the lower confidence interval bound.
+
+Most subtypes store this in `.ci_lower`; an override exists for
+`FactorForecast` (`.observables_lower`).
+"""
+lower_bound(f::AbstractForecastResult) = f.ci_lower
+
+"""
+    upper_bound(f::AbstractForecastResult)
+
+Return the upper confidence interval bound.
+
+Most subtypes store this in `.ci_upper`; an override exists for
+`FactorForecast` (`.observables_upper`).
+"""
+upper_bound(f::AbstractForecastResult) = f.ci_upper
+
+"""
+    forecast_horizon(f::AbstractForecastResult)
+
+Return the forecast horizon (number of steps ahead).
+"""
+forecast_horizon(f::AbstractForecastResult) = f.horizon
+
+# =============================================================================
 # Abstract Types - Analysis Result Types
 # =============================================================================
 
