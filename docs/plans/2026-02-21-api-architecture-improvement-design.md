@@ -118,24 +118,9 @@ MacroEconometricModelsPrettyTablesExt = "PrettyTables"
 
 **Expected improvement**: Load time from ~60s → ~15s for VAR-only users.
 
-### B2. Eliminate unnecessary data storage
+### ~~B2. Eliminate unnecessary data storage~~ DROPPED
 
-**Problem**: VARModel, LPModel, VECMModel store both raw data (`Y`) and residuals (`U`). BVARPosterior stores `data` (never used downstream).
-
-**Solution**:
-
-**VARModel**: Remove `Y` field. Keep `U` (needed for `report()` residual diagnostics and Granger causality). Add `_T_eff::Int` field for effective sample size. Users needing raw data should keep their own reference.
-
-**VECMModel**: Same as VARModel — remove `Y`, keep `U`.
-
-**BVARPosterior**: Remove `data` field. Add `_T_eff::Int` and `_n::Int` for dimensions.
-
-**LPModel**: Keep both `Y` (needed for re-estimation at different horizons) and `residuals` (per-horizon, needed for inference). No change.
-
-**Migration**:
-- Deprecate `model.Y` access with `@deprecate` warning in v0.2.5
-- Remove field in v0.3.0
-- Update all internal code that accesses `model.Y` to use stored dimensions or `residuals()`
+**Dropped after verification**: `model.Y` is used in 15+ locations across `src/var/` (bootstrap IRF, forecasting, HD actual values, predict, vcov, nobs). `post.data` is used in 9+ locations across `src/bvar/`, `src/var/` (IRF/FEVD/HD with data override, forecasting). These fields are **essential**, not redundant. The initial exploration incorrectly classified them as unnecessary.
 
 ### B3. Consolidate Kalman filters
 
@@ -261,8 +246,7 @@ end
 3. B5: Forecast accessors (~1-2 days)
 4. B6: Display helper (~2 days)
 5. B1: Package extensions (~3-4 days) — highest risk
-6. B2: Remove model.Y (~3-4 days) — most breaking
-7. Full test suite run + version bump
+6. Full test suite run + version bump
 
 ---
 
@@ -272,7 +256,6 @@ end
 |------|------|------------|
 | A2 (LPForecast rename) | Low | grep + replace, test coverage good |
 | B1 (Package extensions) | Medium | Requires Julia 1.9+; test with/without deps |
-| B2 (Remove model.Y) | High | Deprecation warning in v0.2.5 first |
 | B3 (Kalman consolidation) | Medium | Numerical equivalence tests for all 3 callers |
 | B4 (Cov registry) | Low | Drop-in replacement, same behavior |
 
@@ -287,3 +270,4 @@ end
 - `summary_display.jl` reduced by >50% in LOC
 - Package load time <20s without optional deps (Phase B)
 - All exported functions have docstrings
+- Covariance estimators extensible via registry pattern
