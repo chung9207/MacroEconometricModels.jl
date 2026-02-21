@@ -188,17 +188,12 @@ returns a large diagonal matrix as fallback.
 function _compute_unconditional_covariance(T_mat::AbstractMatrix{T}, Q::AbstractMatrix{T},
     state_dim::Int; max_iter::Int=1000, tol::Float64=1e-10
 ) where {T<:AbstractFloat}
-    # Check stationarity
+    # Check stationarity — fall back to diffuse initialization for non-stationary systems
     maximum(abs.(eigvals(T_mat))) >= 1.0 && return Matrix{T}(10.0 * I(state_dim))
 
-    # Iterate Lyapunov equation
-    P = Matrix{T}(I(state_dim))
-    for _ in 1:max_iter
-        P_new = T_mat * P * T_mat' + Q
-        norm(P_new - P) < tol * norm(P) && return Symmetric(P_new)
-        P = P_new
-    end
-    Symmetric(P)
+    # Solve discrete Lyapunov equation via shared utility
+    P = _solve_discrete_lyapunov(T_mat, Q; max_iter=max_iter, tol=tol)
+    return Matrix{T}(P)
 end
 
 # =============================================================================

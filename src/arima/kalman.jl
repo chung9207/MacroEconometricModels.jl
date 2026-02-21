@@ -222,15 +222,9 @@ end
 Solve discrete Lyapunov equation P = T P T' + Q by iteration.
 """
 function _solve_lyapunov(T_mat::Matrix{T}, Q::Matrix{T}, n::Int; max_iter::Int=1000, tol::T=T(1e-10)) where {T<:AbstractFloat}
-    P = Matrix{T}(I(n))
-    for _ in 1:max_iter
-        P_new = T_mat * P * T_mat' + Q
-        if norm(P_new - P) < tol * max(norm(P), one(T))
-            return Symmetric(P_new)
-        end
-        P = P_new
-    end
-    Symmetric(P)
+    # Delegate to shared discrete Lyapunov solver
+    P = _solve_discrete_lyapunov(T_mat, Q; max_iter=max_iter, tol=tol)
+    return Symmetric(Matrix{T}(P))
 end
 
 # =============================================================================

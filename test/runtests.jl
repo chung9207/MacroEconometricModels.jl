@@ -32,6 +32,7 @@ const TEST_GROUPS = [
     # Group 1: Core VAR + Bayesian (heavy MCMC)
     ("Core & Bayesian" => [
         "core/test_aqua.jl",
+        "core/test_kalman.jl",
         "var/test_core_var.jl",
         "bvar/test_bayesian.jl",
         "bvar/test_samplers.jl",
@@ -214,6 +215,10 @@ else
     @testset "MacroEconometricModels Package Tests" begin
         @testset "Aqua" begin
             include("core/test_aqua.jl")
+        end
+
+        @testset "Core Kalman" begin
+            include("core/test_kalman.jl")
         end
 
         @testset "Core VAR" begin
