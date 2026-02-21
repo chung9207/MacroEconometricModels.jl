@@ -64,7 +64,7 @@ using Statistics
         f = lp_fevd(slp, H; method=:r2, n_boot=(FAST ? 25 : 50), bias_correct=true, conf_level=0.90)
 
         @test f isa LPFEVD{Float64}
-        @test f.n_boot == 50
+        @test f.n_boot == (FAST ? 25 : 50)
         @test f.conf_level ≈ 0.90
         @test f.bias_correction == true
 
@@ -159,7 +159,7 @@ using Statistics
     @testset "Bootstrap with explicit var_lags" begin
         f = lp_fevd(slp, 8; n_boot=(FAST ? 15 : 30), var_lags=2)
 
-        @test f.n_boot == 30
+        @test f.n_boot == (FAST ? 15 : 30)
         @test all(isfinite, f.bias_corrected)
         @test all(isfinite, f.se)
     end

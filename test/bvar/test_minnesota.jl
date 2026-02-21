@@ -60,7 +60,7 @@ Random.seed!(42)
     post = estimate_bvar(Y, p; n_draws=(FAST ? 50 : 100), prior=:minnesota, hyper=hyper)
 
     @test post isa BVARPosterior
-    @test post.n_draws == 100
+    @test post.n_draws == (FAST ? 50 : 100)
     @test post.prior == :minnesota
 
     # Basic check: posterior mean should be somewhat reasonable (within bounds)
